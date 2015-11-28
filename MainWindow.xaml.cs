@@ -8,14 +8,15 @@ namespace Chip8
 {
     public partial class MainWindow : Window
     {
+        Engine _engine;
+
         public MainWindow()
         {
             InitializeComponent();
 
-            Engine engine = new Engine();
-            engine.Clock();
-            engine.Clock();
-            engine.Clock();
+            _engine = new Engine();
+            _engine.Initialize();
+            _engine.Start();
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)
@@ -51,6 +52,11 @@ namespace Chip8
             SDL.SDL_RenderClear(sdlRendererPointer);
             SDL.SDL_RenderCopy(sdlRendererPointer, sdlTexturePointer, IntPtr.Zero, ref drawableRegion);
             SDL.SDL_RenderPresent(sdlRendererPointer);
+        }
+
+        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            _engine.Stop();
         }
     }
 }
