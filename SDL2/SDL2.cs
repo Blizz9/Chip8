@@ -4333,9 +4333,11 @@ namespace SDL2
 		/* Numkeys returns the size of the array if non-null */
 		[DllImport(nativeLibName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern IntPtr SDL_GetKeyboardState(out int numkeys);
+        [DllImport(nativeLibName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr SDL_GetKeyboardState(IntPtr numkeys);
 
-		/* Get the current key modifier state for the keyboard. */
-		[DllImport(nativeLibName, CallingConvention = CallingConvention.Cdecl)]
+        /* Get the current key modifier state for the keyboard. */
+        [DllImport(nativeLibName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern SDL_Keymod SDL_GetModState();
 
 		/* Set the current key modifier state */
