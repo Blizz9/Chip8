@@ -1,4 +1,5 @@
 ﻿using OpenTK;
+using OpenTK.Audio.OpenAL;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Input;
 using System;
@@ -115,6 +116,29 @@ namespace Chip8
         {
             _screenRefreshTimer.Stop();
             _engine.Stop();
+        }
+
+        private void Button_Click(object sender, RoutedEventArgs e)
+        {
+            //const int sampleRate = 44100;
+
+            //short[] audioData;
+            //int buffer;
+            //int source;
+
+            //buffer = AL.GenBuffer();
+            //source = AL.GenSource();
+
+            //int frames = 1 * sampleRate;
+            //audioData = new short[frames];
+            //for (int i = 0; i < frames; i++)
+            //{
+            //    audioData[i] = (short)(short.MaxValue * Math.Sin((2 * Math.PI * 10) / sampleRate * i));
+            //}
+
+            //AL.BufferData(buffer, ALFormat.Mono16, audioData, audioData.Length * 2, sampleRate);
+            //AL.Source(source, ALSourcei.Buffer, buffer);
+            //AL.SourcePlay(source);
         }
     }
 }

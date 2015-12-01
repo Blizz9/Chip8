@@ -18,24 +18,27 @@ namespace Chip8
         private const uint MEMORY_SIZE = 0x1000;
         private const byte REGISTER_COUNT = 0x10;
         private const byte STACK_SIZE = 0x10;
-        private const byte BITS_IN_BYTE = 8;
         private const uint MEMORY_ROM_OFFSET = 0x200;
+
         private const byte OPCODE_SIZE = 0x2;
         private const byte FONT_SIZE = 0x5;
+
         private const byte BATCH_COUNT = 50;
         private const uint CYCLE_HZ = 1000;
-        private const uint MILLISECONDS_IN_SECOND = 1000;
         private const byte INTERNAL_TIMER_HZ = 60;
 
+        private const byte BITS_IN_BYTE = 8;
+        private const uint MILLISECONDS_IN_SECOND = 1000;
+
         private byte[] _memory;
+        private uint _pc; // program counter
         private byte[] _v; // registers
         private uint _i; // index register
-        private uint _pc; // program counter
         private uint[] _stack;
         private byte _sp; // stack pointer
-        private byte[] _screen;
         private byte _delayTimer;
         private byte _soundTimer;
+        private byte[] _screen;
 
         private System.Timers.Timer _internalTimer;
 
@@ -62,7 +65,7 @@ namespace Chip8
             //Screen = new byte[(SCREEN_WIDTH / BITS_IN_BYTE) * (SCREEN_HEIGHT / BITS_IN_BYTE)];
             Screen = new byte[SCREEN_WIDTH * SCREEN_HEIGHT];
 
-            _internalTimer = new System.Timers.Timer(1000 / INTERNAL_TIMER_HZ);
+            _internalTimer = new System.Timers.Timer(MILLISECONDS_IN_SECOND / INTERNAL_TIMER_HZ);
             _internalTimer.Elapsed += internalTimerClock;
 
             _opcodeMap = new Dictionary<byte, Action<uint>>();
@@ -313,10 +316,10 @@ namespace Chip8
             //byte[] rom = File.ReadAllBytes("ROMs\\Breakout [Carmelo Cortez, 1979].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\15 Puzzle [Roger Ivie].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\Cave.ch8");
-            byte[] rom = File.ReadAllBytes("ROMs\\Breakout (Brix hack) [David Winter, 1997].ch8");
+            //byte[] rom = File.ReadAllBytes("ROMs\\Breakout (Brix hack) [David Winter, 1997].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\Particle Demo [zeroZshadow, 2008].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\Pong 2 (Pong hack) [David Winter, 1997].ch8");
-            //byte[] rom = File.ReadAllBytes("ROMs\\Tetris [Fran Dachille, 1991].ch8");
+            byte[] rom = File.ReadAllBytes("ROMs\\Tetris [Fran Dachille, 1991].ch8");
 
             Buffer.BlockCopy(rom, 0, _memory, (int)MEMORY_ROM_OFFSET, rom.Length);
 
@@ -386,10 +389,6 @@ namespace Chip8
             byte opcodeMSN = (byte)((opcode & 0xF000) >> 12);
 
             _opcodeMap[opcodeMSN](opcode);
-
-            
-
-            //_sw.Stop();
         }
 
         private void internalTimerClock(object sender, ElapsedEventArgs e)
@@ -682,12 +681,6 @@ namespace Chip8
             }
 
             _v[0xF] = collision ? (byte)1 : (byte)0;
-
-            //lock (_sync)
-            //{
-            //    if (_screenRefreshed != null)
-            //        _screenRefreshed();
-            //}
         }
 
         #region EXXX Operations
@@ -697,9 +690,7 @@ namespace Chip8
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
 
-            byte keypress = 0xFF;
-            lock (_sync)
-                keypress = _getKeypress();
+            byte keypress = GetKeypress();
 
             if (_v[registerX] == keypress)
                 _pc += OPCODE_SIZE;
@@ -710,9 +701,7 @@ namespace Chip8
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
 
-            byte keypress = 0;
-            lock (_sync)
-                keypress = _getKeypress();
+            byte keypress = GetKeypress();
 
             if (_v[registerX] != keypress)
                 _pc += OPCODE_SIZE;
@@ -734,11 +723,10 @@ namespace Chip8
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
 
-            byte keypress = 0;
+            byte keypress = 0xFF;
 
-            while ((keypress == 0) && running)
-                lock (_sync)
-                    keypress = _getKeypress();
+            while ((keypress == 0xFF) && running)
+                keypress = GetKeypress();
 
             _v[registerX] = keypress;
         }
