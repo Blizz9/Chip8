@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
+using System.Timers;
 
 namespace Chip8
 {
     // TODO: Make screen storage bits instead of bytes
     // TODO: Check if tight loops take up all of the CPU
+    // TODO: Figure out what is eating up so many cycles
 
     internal class Engine
     {
@@ -21,16 +23,19 @@ namespace Chip8
         private const uint MEMORY_ROM_OFFSET = 0x200;
         private const byte OPCODE_SIZE = 0x2;
         private const byte FONT_SIZE = 0x5;
+        private const byte INTERNAL_TIMER_HZ = 60;
 
         private byte[] _memory;
         private byte[] _v; // registers
-        private uint _i; // index registers
+        private uint _i; // index register
         private uint _pc; // program counter
         private uint[] _stack;
         private byte _sp; // stack pointer
         private byte[] _screen;
         private byte _delayTimer;
         private byte _soundTimer;
+
+        private System.Timers.Timer _internalTimer;
 
         private List<byte[]> _fonts;
 
@@ -55,6 +60,9 @@ namespace Chip8
             _stack = new uint[STACK_SIZE];
             //Screen = new byte[(SCREEN_WIDTH / BITS_IN_BYTE) * (SCREEN_HEIGHT / BITS_IN_BYTE)];
             Screen = new byte[SCREEN_WIDTH * SCREEN_HEIGHT];
+
+            _internalTimer = new System.Timers.Timer(1000 / INTERNAL_TIMER_HZ);
+            _internalTimer.Elapsed += internalTimerClock;
 
             _fonts = new List<byte[]>();
 
@@ -218,7 +226,9 @@ namespace Chip8
             _opcodeMapEXXX.Add(0xA1, jumpIfKeyNotPressed);
 
             _opcodeMapFXXX = new Dictionary<byte, Action<uint>>();
+            _opcodeMapFXXX.Add(0x07, readDelayTimer);
             _opcodeMapFXXX.Add(0x0A, waitForKeypress);
+            _opcodeMapFXXX.Add(0x15, loadDelayTimer);
             _opcodeMapFXXX.Add(0x18, loadSoundTimer);
             _opcodeMapFXXX.Add(0x1E, addToIndex);
             _opcodeMapFXXX.Add(0x29, addressFontCharacter);
@@ -241,6 +251,18 @@ namespace Chip8
         {
             get { lock (_sync) { return (_paused); } }
             set { lock (_sync) { _paused = value; } }
+        }
+
+        private byte delayTimer
+        {
+            get { lock (_sync) { return (_delayTimer); } }
+            set { lock (_sync) { _delayTimer = value; } }
+        }
+
+        private byte soundTimer
+        {
+            get { lock (_sync) { return (_soundTimer); } }
+            set { lock (_sync) { _soundTimer = value; } }
         }
 
         #endregion
@@ -280,24 +302,27 @@ namespace Chip8
             Array.Clear(_stack, 0, _stack.Length);
             Array.Clear(Screen, 0, Screen.Length);
 
-            byte[] rom = File.ReadAllBytes("ROMs\\Chip8 emulator Logo [Garstyciuks].ch8");
+            //byte[] rom = File.ReadAllBytes("ROMs\\Chip8 emulator Logo [Garstyciuks].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\Chip8 Picture.ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\Breakout [Carmelo Cortez, 1979].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\15 Puzzle[Roger Ivie].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\Cave.ch8");
+            byte[] rom = File.ReadAllBytes("ROMs\\Breakout (Brix hack) [David Winter, 1997].ch8");
 
             Buffer.BlockCopy(rom, 0, _memory, (int)MEMORY_ROM_OFFSET, rom.Length);
 
             _i = 0;
             _pc = MEMORY_ROM_OFFSET;
             _sp = 0;
-            _delayTimer = 0;
-            _soundTimer = 0;
+            delayTimer = 0;
+            soundTimer = 0;
         }
 
         internal void Start()
         {
             running = true;
+
+            _internalTimer.Start();
 
             Thread engineThread = new Thread(loop);
             engineThread.Start();
@@ -305,6 +330,7 @@ namespace Chip8
 
         internal void Stop()
         {
+            _internalTimer.Stop();
             running = false;
         }
 
@@ -323,7 +349,7 @@ namespace Chip8
 
         private void clock()
         {
-            //Thread.Sleep(1);
+            Thread.Sleep(1);
 
             uint opcode = (uint)(_memory[_pc] << 8) | _memory[_pc + 1];
             _pc += OPCODE_SIZE;
@@ -333,6 +359,15 @@ namespace Chip8
             Debug.Assert(_opcodeMap.ContainsKey(opcodeMSN), string.Format("Opcode 0x{0} not implemented", opcode.ToString("X4")));
 
             _opcodeMap[opcodeMSN](opcode);
+        }
+
+        private void internalTimerClock(object sender, ElapsedEventArgs e)
+        {
+            if (delayTimer > 0)
+                delayTimer--;
+
+            if (soundTimer > 0)
+                soundTimer--;
         }
 
         #endregion
@@ -591,6 +626,13 @@ namespace Chip8
 
         #region FXXX Operations
 
+        // FX07
+        private void readDelayTimer(uint opcode)
+        {
+            byte registerX = (byte)((opcode & 0x0F00) >> 8);
+            _v[registerX] = delayTimer;
+        }
+
         // FX0A
         private void waitForKeypress(uint opcode)
         {
@@ -611,11 +653,18 @@ namespace Chip8
             _v[registerX] = keypress;
         }
 
+        // FX15
+        private void loadDelayTimer(uint opcode)
+        {
+            byte registerX = (byte)((opcode & 0x0F00) >> 8);
+            delayTimer = _v[registerX];
+        }
+
         // FX18
         private void loadSoundTimer(uint opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
-            _soundTimer = _v[registerX];
+            soundTimer = _v[registerX];
         }
 
         // FX1E
