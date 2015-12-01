@@ -35,7 +35,7 @@ namespace Chip8
             GL.MatrixMode(MatrixMode.Projection);
             GL.LoadIdentity();
 
-            GL.Ortho(0, _openGLControl.Width, _openGLControl.Height, 0, -1, 1);
+            GL.Ortho(0, Engine.SCREEN_WIDTH, Engine.SCREEN_HEIGHT, 0, -1, 1);
             GL.Viewport(0, 0, _openGLControl.Width, _openGLControl.Height);
         }
 
@@ -50,7 +50,7 @@ namespace Chip8
 
             GL.Color3(Color.White);
 
-            GL.Begin(PrimitiveType.Points);
+            GL.Begin(PrimitiveType.Quads);
 
             byte[] screen = _engine.Screen;
             for (int screenY = 0; screenY < Engine.SCREEN_HEIGHT; screenY++)
@@ -60,6 +60,9 @@ namespace Chip8
                     if (screen[(screenY * Engine.SCREEN_WIDTH) + screenX] == 1)
                     {
                         GL.Vertex2(screenX, screenY);
+                        GL.Vertex2(screenX + 1, screenY);
+                        GL.Vertex2(screenX + 1, screenY + 1);
+                        GL.Vertex2(screenX, screenY + 1);
                     }
                 }
             }
@@ -67,14 +70,6 @@ namespace Chip8
             GL.End();
 
             _openGLControl.SwapBuffers();
-        }
-
-        private void invalidateScreen()
-        {
-            Dispatcher.BeginInvoke((Action)(() =>
-            {
-                _openGLControl.Invalidate();
-            }));
         }
 
         private byte getKeypress()
@@ -100,12 +95,11 @@ namespace Chip8
         {
             if (_engine == null)
             {
-                _screenRefreshTimer = new System.Timers.Timer(64);
+                _screenRefreshTimer = new System.Timers.Timer(40);
                 _screenRefreshTimer.Elapsed += _screenRefreshTimer_Elapsed;
                 _screenRefreshTimer.Start();
 
                 _engine = new Engine();
-                _engine.ScreenRefreshed = invalidateScreen;
                 _engine.GetKeypress = getKeypress;
                 _engine.Initialize();
                 _engine.Start();

@@ -8,8 +8,6 @@ using System.Timers;
 namespace Chip8
 {
     // TODO: Make screen storage bits instead of bytes
-    // TODO: Check if tight loops take up all of the CPU
-    // TODO: Figure out what is eating up so many cycles
     // TODO: Add sound
 
     internal class Engine
@@ -24,6 +22,9 @@ namespace Chip8
         private const uint MEMORY_ROM_OFFSET = 0x200;
         private const byte OPCODE_SIZE = 0x2;
         private const byte FONT_SIZE = 0x5;
+        private const byte BATCH_COUNT = 50;
+        private const uint CYCLE_HZ = 1000;
+        private const uint MILLISECONDS_IN_SECOND = 1000;
         private const byte INTERNAL_TIMER_HZ = 60;
 
         private byte[] _memory;
@@ -51,7 +52,6 @@ namespace Chip8
         private bool _running;
         private bool _paused;
 
-        private Action _screenRefreshed;
         private Func<byte> _getKeypress;
 
         internal Engine()
@@ -156,12 +156,6 @@ namespace Chip8
         #endregion
 
         #region Accessible Callbacks
-
-        internal Action ScreenRefreshed
-        {
-            get { lock (_sync) { return (_screenRefreshed); } }
-            set { lock (_sync) { _screenRefreshed = value; } }
-        }
 
         internal Func<byte> GetKeypress
         {
@@ -319,10 +313,10 @@ namespace Chip8
             //byte[] rom = File.ReadAllBytes("ROMs\\Breakout [Carmelo Cortez, 1979].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\15 Puzzle [Roger Ivie].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\Cave.ch8");
-            //byte[] rom = File.ReadAllBytes("ROMs\\Breakout (Brix hack) [David Winter, 1997].ch8");
+            byte[] rom = File.ReadAllBytes("ROMs\\Breakout (Brix hack) [David Winter, 1997].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\Particle Demo [zeroZshadow, 2008].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\Pong 2 (Pong hack) [David Winter, 1997].ch8");
-            byte[] rom = File.ReadAllBytes("ROMs\\Tetris [Fran Dachille, 1991].ch8");
+            //byte[] rom = File.ReadAllBytes("ROMs\\Tetris [Fran Dachille, 1991].ch8");
 
             Buffer.BlockCopy(rom, 0, _memory, (int)MEMORY_ROM_OFFSET, rom.Length);
 
@@ -355,23 +349,47 @@ namespace Chip8
 
         private void loop()
         {
+            Stopwatch timingStopwatch = new Stopwatch();
+            int cycleCount = 0;
+
             while (running)
             {
                 if (!paused)
+                {
+                    if (!timingStopwatch.IsRunning)
+                    {
+                        cycleCount = 0;
+                        timingStopwatch.Reset();
+                        timingStopwatch.Start();
+                    }
+
                     clock();
+
+                    cycleCount++;
+
+                    if (cycleCount >= (CYCLE_HZ / BATCH_COUNT))
+                    {
+                        timingStopwatch.Stop();
+
+                        if (timingStopwatch.ElapsedMilliseconds < (MILLISECONDS_IN_SECOND / BATCH_COUNT))
+                            Thread.Sleep((int)((MILLISECONDS_IN_SECOND / BATCH_COUNT) - timingStopwatch.ElapsedMilliseconds));
+                    }
+                }
             }
         }
 
         private void clock()
         {
-            //Thread.Sleep(1);
-
             uint opcode = (uint)(_memory[_pc] << 8) | _memory[_pc + 1];
             _pc += OPCODE_SIZE;
 
             byte opcodeMSN = (byte)((opcode & 0xF000) >> 12);
 
             _opcodeMap[opcodeMSN](opcode);
+
+            
+
+            //_sw.Stop();
         }
 
         private void internalTimerClock(object sender, ElapsedEventArgs e)
@@ -670,8 +688,6 @@ namespace Chip8
             //    if (_screenRefreshed != null)
             //        _screenRefreshed();
             //}
-
-            //Thread.Sleep(60000);
         }
 
         #region EXXX Operations
