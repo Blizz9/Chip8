@@ -1,4 +1,6 @@
 ﻿using OpenTK;
+using OpenTK.Audio;
+using OpenTK.Audio.OpenAL;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Input;
 using System;
@@ -14,7 +16,11 @@ namespace Chip8
     public partial class MainWindow : Window
     {
         private GLControl _openGLControl;
+
         private Engine _engine;
+
+        private int _openALToneSourceID;
+
         private System.Timers.Timer _screenRefreshTimer;
 
         public MainWindow()
@@ -27,6 +33,19 @@ namespace Chip8
             openGLControlHost.Child = _openGLControl;
             _openGLControl.Load += _openGLControl_Load;
             _openGLControl.Paint += _openGLControl_Paint;
+
+            short[] tone = new short[(int)(.20 * Engine.TONE_SAMPLE_RATE)];
+            for (int index = 0; index < tone.Length; index++)
+            {
+                tone[index] = (short)(short.MaxValue * Math.Sin(((2 * Math.PI * Engine.TONE_FREQUENCY) / Engine.TONE_SAMPLE_RATE) * index));
+            }
+
+            AudioContext audioContext = new AudioContext();
+            int openALBufferID = AL.GenBuffer();
+            _openALToneSourceID = AL.GenSource();
+            AL.BufferData(openALBufferID, ALFormat.Mono16, tone, (tone.Length * 2), (int)Engine.TONE_SAMPLE_RATE);
+            AL.Source(_openALToneSourceID, ALSourcei.Buffer, openALBufferID);
+            AL.Source(_openALToneSourceID, ALSourceb.Looping, true);
         }
 
         private void _openGLControl_Load(object sender, EventArgs e)
@@ -90,6 +109,17 @@ namespace Chip8
             return (0xFF);
         }
 
+        private void playTone()
+        {
+            if (AL.GetSourceState(_openALToneSourceID) != ALSourceState.Playing)
+                AL.SourcePlay(_openALToneSourceID);
+        }
+
+        private void stopTone()
+        {
+            AL.SourceStop(_openALToneSourceID);
+        }
+
         private void Window_Activated(object sender, EventArgs e)
         {
             if (_engine == null)
@@ -100,6 +130,8 @@ namespace Chip8
 
                 _engine = new Engine();
                 _engine.GetKeypress = getKeypress;
+                _engine.PlayTone = playTone;
+                _engine.StopTone = stopTone;
                 _engine.Initialize();
                 _engine.Start();
             }
@@ -118,25 +150,10 @@ namespace Chip8
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            //const int sampleRate = 44100;
-
-            //short[] audioData;
-            //int buffer;
-            //int source;
-
-            //buffer = AL.GenBuffer();
-            //source = AL.GenSource();
-
-            //int frames = 1 * sampleRate;
-            //audioData = new short[frames];
-            //for (int i = 0; i < frames; i++)
-            //{
-            //    audioData[i] = (short)(short.MaxValue * Math.Sin((2 * Math.PI * 10) / sampleRate * i));
-            //}
-
-            //AL.BufferData(buffer, ALFormat.Mono16, audioData, audioData.Length * 2, sampleRate);
-            //AL.Source(source, ALSourcei.Buffer, buffer);
-            //AL.SourcePlay(source);
+            //if (AL.GetSourceState(_openALToneSourceID) == ALSourceState.Playing)
+            //    AL.SourceStop(_openALToneSourceID);
+            //else
+            //    AL.SourcePlay(_openALToneSourceID);
         }
     }
 }

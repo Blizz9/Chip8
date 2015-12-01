@@ -7,8 +7,14 @@ using System.Timers;
 
 namespace Chip8
 {
-    // TODO: Make screen storage bits instead of bytes
-    // TODO: Add sound
+    // TODO: Clean up code
+    // TODO: Add save/load state
+    // TODO: Add ROM selector and close
+    // TODO: Add speed selector
+    // TODO: Add reset
+    // TODO: Add pause on menu popup
+    // TODO: Add key graphic
+    // TODO: Add key highlighting based on opcodess
 
     internal class Engine
     {
@@ -24,8 +30,11 @@ namespace Chip8
         private const byte FONT_SIZE = 0x5;
 
         private const byte BATCH_COUNT = 50;
-        private const uint CYCLE_HZ = 1000;
+        private const uint CYCLE_HZ = 700;
         private const byte INTERNAL_TIMER_HZ = 60;
+
+        public const uint TONE_SAMPLE_RATE = 44100;
+        public const uint TONE_FREQUENCY = 365;
 
         public const byte BITS_PER_BYTE = 8;
         private const uint MILLISECONDS_PER_SECOND = 1000;
@@ -56,6 +65,8 @@ namespace Chip8
         private bool _paused;
 
         private Func<byte> _getKeypress;
+        private Action _playTone;
+        private Action _stopTone;
 
         internal Engine()
         {
@@ -163,6 +174,18 @@ namespace Chip8
         {
             get { lock (_sync) { return (_getKeypress); } }
             set { lock (_sync) { _getKeypress = value; } }
+        }
+
+        internal Action PlayTone
+        {
+            get { lock (_sync) { return (_playTone); } }
+            set { lock (_sync) { _playTone = value; } }
+        }
+
+        internal Action StopTone
+        {
+            get { lock (_sync) { return (_stopTone); } }
+            set { lock (_sync) { _stopTone = value; } }
         }
 
         #endregion
@@ -316,9 +339,9 @@ namespace Chip8
             //byte[] rom = File.ReadAllBytes("ROMs\\15 Puzzle [Roger Ivie].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\Cave.ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\Breakout (Brix hack) [David Winter, 1997].ch8");
-            //byte[] rom = File.ReadAllBytes("ROMs\\Particle Demo [zeroZshadow, 2008].ch8");
+            byte[] rom = File.ReadAllBytes("ROMs\\Particle Demo [zeroZshadow, 2008].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\Pong 2 (Pong hack) [David Winter, 1997].ch8");
-            byte[] rom = File.ReadAllBytes("ROMs\\Tetris [Fran Dachille, 1991].ch8");
+            //byte[] rom = File.ReadAllBytes("ROMs\\Tetris [Fran Dachille, 1991].ch8");
 
             Buffer.BlockCopy(rom, 0, _memory, (int)MEMORY_ROM_OFFSET, rom.Length);
 
@@ -396,7 +419,12 @@ namespace Chip8
                 delayTimer--;
 
             if (soundTimer > 0)
+            {
                 soundTimer--;
+
+                if (soundTimer == 0)
+                    StopTone();
+            }
         }
 
         #endregion
@@ -736,6 +764,9 @@ namespace Chip8
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
             soundTimer = _v[registerX];
+
+            if (soundTimer > 0)
+                PlayTone();
         }
 
         // FX1E
