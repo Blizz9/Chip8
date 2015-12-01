@@ -1,5 +1,4 @@
 ﻿using OpenTK;
-using OpenTK.Audio.OpenAL;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Input;
 using System;
@@ -9,7 +8,6 @@ using System.Drawing;
 using System.Timers;
 using System.Windows;
 using System.Windows.Forms;
-using System.Windows.Threading;
 
 namespace Chip8
 {

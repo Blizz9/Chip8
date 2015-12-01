@@ -27,8 +27,8 @@ namespace Chip8
         private const uint CYCLE_HZ = 1000;
         private const byte INTERNAL_TIMER_HZ = 60;
 
-        private const byte BITS_IN_BYTE = 8;
-        private const uint MILLISECONDS_IN_SECOND = 1000;
+        public const byte BITS_PER_BYTE = 8;
+        private const uint MILLISECONDS_PER_SECOND = 1000;
 
         private byte[] _memory;
         private uint _pc; // program counter
@@ -62,10 +62,9 @@ namespace Chip8
             _memory = new byte[MEMORY_SIZE];
             _v = new byte[REGISTER_COUNT];
             _stack = new uint[STACK_SIZE];
-            //Screen = new byte[(SCREEN_WIDTH / BITS_IN_BYTE) * (SCREEN_HEIGHT / BITS_IN_BYTE)];
             Screen = new byte[SCREEN_WIDTH * SCREEN_HEIGHT];
 
-            _internalTimer = new System.Timers.Timer(MILLISECONDS_IN_SECOND / INTERNAL_TIMER_HZ);
+            _internalTimer = new System.Timers.Timer(MILLISECONDS_PER_SECOND / INTERNAL_TIMER_HZ);
             _internalTimer.Elapsed += internalTimerClock;
 
             _opcodeMap = new Dictionary<byte, Action<uint>>();
@@ -374,8 +373,8 @@ namespace Chip8
                     {
                         timingStopwatch.Stop();
 
-                        if (timingStopwatch.ElapsedMilliseconds < (MILLISECONDS_IN_SECOND / BATCH_COUNT))
-                            Thread.Sleep((int)((MILLISECONDS_IN_SECOND / BATCH_COUNT) - timingStopwatch.ElapsedMilliseconds));
+                        if (timingStopwatch.ElapsedMilliseconds < (MILLISECONDS_PER_SECOND / BATCH_COUNT))
+                            Thread.Sleep((int)((MILLISECONDS_PER_SECOND / BATCH_COUNT) - timingStopwatch.ElapsedMilliseconds));
                     }
                 }
             }
@@ -438,12 +437,6 @@ namespace Chip8
         private void clearScreen(uint opcode)
         {
             Array.Clear(Screen, 0, Screen.Length);
-
-            //lock (_sync)
-            //{
-            //    if (_screenRefreshed != null)
-            //        _screenRefreshed();
-            //}
         }
 
         // 00EE
@@ -651,11 +644,11 @@ namespace Chip8
 
             for (int spriteLineIndex = 0; spriteLineIndex < numberOfSpriteLines; spriteLineIndex++)
             {
-                byte pixelLocation = 0x80;
+                byte pixelMask = 0x80;
 
-                while (pixelLocation != 0x00)
+                while (pixelMask != 0x00)
                 {
-                    if ((sprite[spriteLineIndex] & pixelLocation) != 0)
+                    if ((sprite[spriteLineIndex] & pixelMask) != 0)
                     {
                         if (Screen[(yLocation * SCREEN_WIDTH) + xLocation] == 0)
                             Screen[(yLocation * SCREEN_WIDTH) + xLocation] = 1;
@@ -666,7 +659,7 @@ namespace Chip8
                         }
                     }
 
-                    pixelLocation = (byte)(pixelLocation >> 1);
+                    pixelMask = (byte)(pixelMask >> 1);
                     xLocation++;
 
                     if (xLocation >= SCREEN_WIDTH)
