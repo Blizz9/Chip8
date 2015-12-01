@@ -10,6 +10,7 @@ namespace Chip8
     // TODO: Make screen storage bits instead of bytes
     // TODO: Check if tight loops take up all of the CPU
     // TODO: Figure out what is eating up so many cycles
+    // TODO: Add sound
 
     internal class Engine
     {
@@ -63,6 +64,121 @@ namespace Chip8
 
             _internalTimer = new System.Timers.Timer(1000 / INTERNAL_TIMER_HZ);
             _internalTimer.Elapsed += internalTimerClock;
+
+            _opcodeMap = new Dictionary<byte, Action<uint>>();
+            _opcodeMap.Add(0x0, map00EXOperations);
+            _opcodeMap.Add(0x1, jump);
+            _opcodeMap.Add(0x2, callSubroutine);
+            _opcodeMap.Add(0x3, jumpIfEqualTo);
+            _opcodeMap.Add(0x4, jumpIfNotEqualTo);
+            _opcodeMap.Add(0x5, jumpIfEqual);
+            _opcodeMap.Add(0x6, load);
+            _opcodeMap.Add(0x7, appendValue);
+            _opcodeMap.Add(0x8, map8XXXOperations);
+            _opcodeMap.Add(0x9, jumpIfNotEqual);
+            _opcodeMap.Add(0xA, loadIndex);
+            _opcodeMap.Add(0xB, jumpWithOffset);
+            _opcodeMap.Add(0xC, random);
+            _opcodeMap.Add(0xD, drawSprite);
+            _opcodeMap.Add(0xE, mapEXXXOperations);
+            _opcodeMap.Add(0xF, mapFXXXOperations);
+
+            _opcodeMap00EX = new Dictionary<byte, Action<uint>>();
+            _opcodeMap00EX.Add(0xE0, clearScreen);
+            _opcodeMap00EX.Add(0xEE, returnSubroutine);
+
+            _opcodeMap8XXX = new Dictionary<byte, Action<uint>>();
+            _opcodeMap8XXX.Add(0x0, copy);
+            _opcodeMap8XXX.Add(0x1, or);
+            _opcodeMap8XXX.Add(0x2, and);
+            _opcodeMap8XXX.Add(0x3, xor);
+            _opcodeMap8XXX.Add(0x4, add);
+            _opcodeMap8XXX.Add(0x5, subtract);
+            _opcodeMap8XXX.Add(0x6, shiftRight);
+            _opcodeMap8XXX.Add(0x7, subtractReverse);
+            _opcodeMap8XXX.Add(0xE, shiftLeft);
+
+            _opcodeMapEXXX = new Dictionary<byte, Action<uint>>();
+            _opcodeMapEXXX.Add(0x9E, jumpIfKeyPressed);
+            _opcodeMapEXXX.Add(0xA1, jumpIfKeyNotPressed);
+
+            _opcodeMapFXXX = new Dictionary<byte, Action<uint>>();
+            _opcodeMapFXXX.Add(0x07, readDelayTimer);
+            _opcodeMapFXXX.Add(0x0A, waitForKeypress);
+            _opcodeMapFXXX.Add(0x15, loadDelayTimer);
+            _opcodeMapFXXX.Add(0x18, loadSoundTimer);
+            _opcodeMapFXXX.Add(0x1E, addToIndex);
+            _opcodeMapFXXX.Add(0x29, addressFontCharacter);
+            _opcodeMapFXXX.Add(0x33, storeBCD);
+            _opcodeMapFXXX.Add(0x55, dumpRegisters);
+            _opcodeMapFXXX.Add(0x65, fillRegisters);
+
+            running = false;
+            paused = false;
+        }
+
+        #region Private Properties
+
+        private bool running
+        {
+            get { lock (_sync) { return (_running); } }
+            set { lock (_sync) { _running = value; } }
+        }
+
+        private bool paused
+        {
+            get { lock (_sync) { return (_paused); } }
+            set { lock (_sync) { _paused = value; } }
+        }
+
+        private byte delayTimer
+        {
+            get { lock (_sync) { return (_delayTimer); } }
+            set { lock (_sync) { _delayTimer = value; } }
+        }
+
+        private byte soundTimer
+        {
+            get { lock (_sync) { return (_soundTimer); } }
+            set { lock (_sync) { _soundTimer = value; } }
+        }
+
+        #endregion
+
+        #region Accessible Properties
+
+        internal byte[] Screen
+        {
+            get { lock (_sync) { return (_screen); } }
+            set { lock (_sync) { _screen = value; } }
+        }
+
+        #endregion
+
+        #region Accessible Callbacks
+
+        internal Action ScreenRefreshed
+        {
+            get { lock (_sync) { return (_screenRefreshed); } }
+            set { lock (_sync) { _screenRefreshed = value; } }
+        }
+
+        internal Func<byte> GetKeypress
+        {
+            get { lock (_sync) { return (_getKeypress); } }
+            set { lock (_sync) { _getKeypress = value; } }
+        }
+
+        #endregion
+
+        #region Accessible Methods
+
+        internal void Initialize()
+        {
+            Array.Clear(_memory, 0, _memory.Length);
+            Array.Clear(_v, 0, _v.Length);
+            Array.Clear(_stack, 0, _stack.Length);
+            Array.Clear(Screen, 0, Screen.Length);
 
             _fonts = new List<byte[]>();
 
@@ -198,116 +314,15 @@ namespace Chip8
             foreach (byte[] font in _fonts)
                 Buffer.BlockCopy(font, 0, _memory, (0x0000 + (_fonts.IndexOf(font) * FONT_SIZE)), FONT_SIZE);
 
-            _opcodeMap = new Dictionary<byte, Action<uint>>();
-            _opcodeMap.Add(0x0, map00EXOperations);
-            _opcodeMap.Add(0x1, jump);
-            _opcodeMap.Add(0x2, callSubroutine);
-            _opcodeMap.Add(0x3, jumpIfEqual);
-            _opcodeMap.Add(0x4, jumpIfNotEqual);
-            _opcodeMap.Add(0x6, loadRegister);
-            _opcodeMap.Add(0x7, addValueToRegister);
-            _opcodeMap.Add(0x8, map8XXXOperations);
-            _opcodeMap.Add(0xA, loadIndex);
-            _opcodeMap.Add(0xC, randomAND);
-            _opcodeMap.Add(0xD, drawSprite);
-            _opcodeMap.Add(0xE, mapEXXXOperations);
-            _opcodeMap.Add(0xF, mapFXXXOperations);
-
-            _opcodeMap00EX = new Dictionary<byte, Action<uint>>();
-            _opcodeMap00EX.Add(0xE0, clearScreen);
-            _opcodeMap00EX.Add(0xEE, returnSubroutine);
-
-            _opcodeMap8XXX = new Dictionary<byte, Action<uint>>();
-            _opcodeMap8XXX.Add(0x2, andRegisters);
-            _opcodeMap8XXX.Add(0x4, addRegisters);
-
-            _opcodeMapEXXX = new Dictionary<byte, Action<uint>>();
-            _opcodeMapEXXX.Add(0x9E, jumpIfKeyPressed);
-            _opcodeMapEXXX.Add(0xA1, jumpIfKeyNotPressed);
-
-            _opcodeMapFXXX = new Dictionary<byte, Action<uint>>();
-            _opcodeMapFXXX.Add(0x07, readDelayTimer);
-            _opcodeMapFXXX.Add(0x0A, waitForKeypress);
-            _opcodeMapFXXX.Add(0x15, loadDelayTimer);
-            _opcodeMapFXXX.Add(0x18, loadSoundTimer);
-            _opcodeMapFXXX.Add(0x1E, addToIndex);
-            _opcodeMapFXXX.Add(0x29, addressFontCharacter);
-            _opcodeMapFXXX.Add(0x33, storeBCD);
-            _opcodeMapFXXX.Add(0x65, fillRegisters);
-
-            running = false;
-            paused = false;
-        }
-
-        #region Private Properties
-
-        private bool running
-        {
-            get { lock (_sync) { return (_running); } }
-            set { lock (_sync) { _running = value; } }
-        }
-
-        private bool paused
-        {
-            get { lock (_sync) { return (_paused); } }
-            set { lock (_sync) { _paused = value; } }
-        }
-
-        private byte delayTimer
-        {
-            get { lock (_sync) { return (_delayTimer); } }
-            set { lock (_sync) { _delayTimer = value; } }
-        }
-
-        private byte soundTimer
-        {
-            get { lock (_sync) { return (_soundTimer); } }
-            set { lock (_sync) { _soundTimer = value; } }
-        }
-
-        #endregion
-
-        #region Accessible Properties
-
-        internal byte[] Screen
-        {
-            get { lock (_sync) { return (_screen); } }
-            set { lock (_sync) { _screen = value; } }
-        }
-
-        #endregion
-
-        #region Accessible Callbacks
-
-        internal Action ScreenRefreshed
-        {
-            get { lock (_sync) { return (_screenRefreshed); } }
-            set { lock (_sync) { _screenRefreshed = value; } }
-        }
-
-        internal Func<byte> GetKeypress
-        {
-            get { lock (_sync) { return (_getKeypress); } }
-            set { lock (_sync) { _getKeypress = value; } }
-        }
-
-        #endregion
-
-        #region Accessible Methods
-
-        internal void Initialize()
-        {
-            Array.Clear(_memory, 0, _memory.Length);
-            Array.Clear(_v, 0, _v.Length);
-            Array.Clear(_stack, 0, _stack.Length);
-            Array.Clear(Screen, 0, Screen.Length);
-
             //byte[] rom = File.ReadAllBytes("ROMs\\Chip8 emulator Logo [Garstyciuks].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\Chip8 Picture.ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\Breakout [Carmelo Cortez, 1979].ch8");
-            //byte[] rom = File.ReadAllBytes("ROMs\\15 Puzzle[Roger Ivie].ch8");
+            //byte[] rom = File.ReadAllBytes("ROMs\\15 Puzzle [Roger Ivie].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\Cave.ch8");
-            byte[] rom = File.ReadAllBytes("ROMs\\Breakout (Brix hack) [David Winter, 1997].ch8");
+            //byte[] rom = File.ReadAllBytes("ROMs\\Breakout (Brix hack) [David Winter, 1997].ch8");
+            //byte[] rom = File.ReadAllBytes("ROMs\\Particle Demo [zeroZshadow, 2008].ch8");
+            //byte[] rom = File.ReadAllBytes("ROMs\\Pong 2 (Pong hack) [David Winter, 1997].ch8");
+            byte[] rom = File.ReadAllBytes("ROMs\\Tetris [Fran Dachille, 1991].ch8");
 
             Buffer.BlockCopy(rom, 0, _memory, (int)MEMORY_ROM_OFFSET, rom.Length);
 
@@ -349,14 +364,12 @@ namespace Chip8
 
         private void clock()
         {
-            Thread.Sleep(1);
+            //Thread.Sleep(1);
 
             uint opcode = (uint)(_memory[_pc] << 8) | _memory[_pc + 1];
             _pc += OPCODE_SIZE;
 
             byte opcodeMSN = (byte)((opcode & 0xF000) >> 12);
-
-            Debug.Assert(_opcodeMap.ContainsKey(opcodeMSN), string.Format("Opcode 0x{0} not implemented", opcode.ToString("X4")));
 
             _opcodeMap[opcodeMSN](opcode);
         }
@@ -377,42 +390,53 @@ namespace Chip8
         private void map00EXOperations(uint opcode)
         {
             byte opcodeLSB = (byte)(opcode & 0x00FF);
-
-            Debug.Assert(_opcodeMap00EX.ContainsKey(opcodeLSB), string.Format("Opcode 0x{0} not implemented", opcode.ToString("X4")));
-
             _opcodeMap00EX[opcodeLSB](opcode);
         }
 
         private void map8XXXOperations(uint opcode)
         {
             byte opcodeLSN = (byte)(opcode & 0x000F);
-
-            Debug.Assert(_opcodeMap8XXX.ContainsKey(opcodeLSN), string.Format("Opcode 0x{0} not implemented", opcode.ToString("X4")));
-
             _opcodeMap8XXX[opcodeLSN](opcode);
         }
 
         private void mapEXXXOperations(uint opcode)
         {
             byte opcodeLSB = (byte)(opcode & 0x00FF);
-
-            Debug.Assert(_opcodeMapEXXX.ContainsKey(opcodeLSB), string.Format("Opcode 0x{0} not implemented", opcode.ToString("X4")));
-
             _opcodeMapEXXX[opcodeLSB](opcode);
         }
 
         private void mapFXXXOperations(uint opcode)
         {
             byte opcodeLSB = (byte)(opcode & 0x00FF);
-
-            Debug.Assert(_opcodeMapFXXX.ContainsKey(opcodeLSB), string.Format("Opcode 0x{0} not implemented", opcode.ToString("X4")));
-
             _opcodeMapFXXX[opcodeLSB](opcode);
         }
 
         #endregion
 
         #region Operations
+
+        #region 00EX Operations
+
+        // 00E0
+        private void clearScreen(uint opcode)
+        {
+            Array.Clear(Screen, 0, Screen.Length);
+
+            //lock (_sync)
+            //{
+            //    if (_screenRefreshed != null)
+            //        _screenRefreshed();
+            //}
+        }
+
+        // 00EE
+        private void returnSubroutine(uint opcode)
+        {
+            _sp--;
+            _pc = _stack[_sp];
+        }
+
+        #endregion
 
         // 1NNN
         private void jump(uint opcode)
@@ -431,7 +455,7 @@ namespace Chip8
         }
 
         // 3XNN
-        private void jumpIfEqual(uint opcode)
+        private void jumpIfEqualTo(uint opcode)
         {
             byte register = (byte)((opcode & 0x0F00) >> 8);
             byte value = (byte)(opcode & 0x00FF);
@@ -440,7 +464,7 @@ namespace Chip8
         }
 
         // 4XNN
-        private void jumpIfNotEqual(uint opcode)
+        private void jumpIfNotEqualTo(uint opcode)
         {
             byte register = (byte)((opcode & 0x0F00) >> 8);
             byte value = (byte)(opcode & 0x00FF);
@@ -448,8 +472,17 @@ namespace Chip8
                 _pc += OPCODE_SIZE;
         }
 
+        // 5XY0
+        private void jumpIfEqual(uint opcode)
+        {
+            byte registerX = (byte)((opcode & 0x0F00) >> 8);
+            byte registerY= (byte)((opcode & 0x00F0) >> 4);
+            if (_v[registerX] == _v[registerY])
+                _pc += OPCODE_SIZE;
+        }
+
         // 6XNN
-        private void loadRegister(uint opcode)
+        private void load(uint opcode)
         {
             byte register = (byte)((opcode & 0x0F00) >> 8);
             byte value = (byte)(opcode & 0x00FF);
@@ -457,11 +490,105 @@ namespace Chip8
         }
 
         // 7XNN
-        private void addValueToRegister(uint opcode)
+        private void appendValue(uint opcode)
         {
             byte register = (byte)((opcode & 0x0F00) >> 8);
             byte value = (byte)(opcode & 0x00FF);
             _v[register] += value;
+        }
+
+        #region 8XXX Operations
+
+        // 8XY0
+        private void copy(uint opcode)
+        {
+            byte registerX = (byte)((opcode & 0x0F00) >> 8);
+            byte registerY = (byte)((opcode & 0x00F0) >> 4);
+            _v[registerX] = _v[registerY];
+        }
+
+        // 8XY1
+        private void or(uint opcode)
+        {
+            byte registerX = (byte)((opcode & 0x0F00) >> 8);
+            byte registerY = (byte)((opcode & 0x00F0) >> 4);
+            _v[registerX] = (byte)(_v[registerX] | _v[registerY]);
+        }
+
+        // 8XY2
+        private void and(uint opcode)
+        {
+            byte registerX = (byte)((opcode & 0x0F00) >> 8);
+            byte registerY = (byte)((opcode & 0x00F0) >> 4);
+            _v[registerX] = (byte)(_v[registerX] & _v[registerY]);
+        }
+
+        // 8XY3
+        private void xor(uint opcode)
+        {
+            byte registerX = (byte)((opcode & 0x0F00) >> 8);
+            byte registerY = (byte)((opcode & 0x00F0) >> 4);
+            _v[registerX] = (byte)(_v[registerX] ^ _v[registerY]);
+        }
+
+        // 8XY4
+        private void add(uint opcode)
+        {
+            byte registerX = (byte)((opcode & 0x0F00) >> 8);
+            byte registerY = (byte)((opcode & 0x00F0) >> 4);
+
+            int result = _v[registerX] + _v[registerY];
+            _v[0xF] = result > (int)byte.MaxValue ? (byte)1 : (byte)0;
+            _v[registerX] = (byte)result;
+        }
+
+        // 8XY5
+        private void subtract(uint opcode)
+        {
+            byte registerX = (byte)((opcode & 0x0F00) >> 8);
+            byte registerY = (byte)((opcode & 0x00F0) >> 4);
+
+            _v[0xF] = _v[registerX] > _v[registerY] ? (byte)1 : (byte)0;
+            _v[registerX] = (byte)(_v[registerX] - _v[registerY]);
+        }
+
+        // 8XY6
+        private void shiftRight(uint opcode)
+        {
+            byte registerX = (byte)((opcode & 0x0F00) >> 8);
+
+            _v[0xF] = (byte)(_v[registerX] & 0x01);
+            _v[registerX] = (byte)(_v[registerX] >> 1);
+        }
+
+        // 8XY7
+        private void subtractReverse(uint opcode)
+        {
+            byte registerX = (byte)((opcode & 0x0F00) >> 8);
+            byte registerY = (byte)((opcode & 0x00F0) >> 4);
+
+            _v[0xF] = _v[registerY] > _v[registerX] ? (byte)1 : (byte)0;
+            _v[registerX] = (byte)(_v[registerY] - _v[registerX]);
+        }
+
+        // 8XYE
+        private void shiftLeft(uint opcode)
+        {
+            byte registerX = (byte)((opcode & 0x0F00) >> 8);
+
+            _v[0xF] = (byte)((_v[registerX] & 0x80) >> 7);
+            _v[registerX] = (byte)(_v[registerX] << 1);
+        }
+
+        #endregion
+
+        // 9XY0
+        private void jumpIfNotEqual(uint opcode)
+        {
+            byte registerX = (byte)((opcode & 0x0F00) >> 8);
+            byte registerY = (byte)((opcode & 0x00F0) >> 4);
+            if (_v[registerX] != _v[registerY])
+                _pc += OPCODE_SIZE;
         }
 
         // ANNN
@@ -471,8 +598,15 @@ namespace Chip8
             _i = address;
         }
 
+        // BNNN
+        private void jumpWithOffset(uint opcode)
+        {
+            uint address = opcode & 0x0FFF;
+            _pc = address + _v[0x0];
+        }
+
         // CXNN
-        private void randomAND(uint opcode)
+        private void random(uint opcode)
         {
             byte register = (byte)((opcode & 0x0F00) >> 8);
             byte value = (byte)(opcode & 0x00FF);
@@ -540,52 +674,6 @@ namespace Chip8
             //Thread.Sleep(60000);
         }
 
-        #region 00EX Operations
-
-        // 00E0
-        private void clearScreen(uint opcode)
-        {
-            Array.Clear(Screen, 0, Screen.Length);
-
-            //lock (_sync)
-            //{
-            //    if (_screenRefreshed != null)
-            //        _screenRefreshed();
-            //}
-        }
-
-        // 00EE
-        private void returnSubroutine(uint opcode)
-        {
-            _sp--;
-            _pc = _stack[_sp];
-        }
-
-        #endregion
-
-        #region 8XXX Operations
-
-        // 8XY2
-        private void andRegisters(uint opcode)
-        {
-            byte registerX = (byte)((opcode & 0x0F00) >> 8);
-            byte registerY = (byte)((opcode & 0x00F0) >> 4);
-            _v[registerX] = (byte)(_v[registerX] & _v[registerY]);
-        }
-
-        // 8XY4
-        private void addRegisters(uint opcode)
-        {
-            byte registerX = (byte)((opcode & 0x0F00) >> 8);
-            byte registerY = (byte)((opcode & 0x00F0) >> 4);
-
-            int result = _v[registerX] + _v[registerY];
-            _v[0xF] = result > (int)byte.MaxValue ? (byte)1 :(byte)0;
-            _v[registerX] = (byte)result;
-        }
-
-        #endregion
-
         #region EXXX Operations
 
         // EX9E
@@ -595,11 +683,7 @@ namespace Chip8
 
             byte keypress = 0xFF;
             lock (_sync)
-            {
-                Debug.Assert(_getKeypress != null, "The GetKeypress callback is not properly set");
-
                 keypress = _getKeypress();
-            }
 
             if (_v[registerX] == keypress)
                 _pc += OPCODE_SIZE;
@@ -612,11 +696,7 @@ namespace Chip8
 
             byte keypress = 0;
             lock (_sync)
-            {
-                Debug.Assert(_getKeypress != null, "The GetKeypress callback is not properly set");
-
                 keypress = _getKeypress();
-            }
 
             if (_v[registerX] != keypress)
                 _pc += OPCODE_SIZE;
@@ -641,14 +721,8 @@ namespace Chip8
             byte keypress = 0;
 
             while ((keypress == 0) && running)
-            {
                 lock (_sync)
-                {
-                    Debug.Assert(_getKeypress != null, "The GetKeypress callback is not properly set");
-
                     keypress = _getKeypress();
-                }
-            }
 
             _v[registerX] = keypress;
         }
@@ -691,15 +765,22 @@ namespace Chip8
             _memory[_i + 2] = (byte)(_v[registerX] % 10);
         }
 
+        // FX55
+        private void dumpRegisters(uint opcode)
+        {
+            byte endRegister = (byte)((opcode & 0x0F00) >> 8);
+
+            for (int register = 0; register <= endRegister; register++)
+                 _memory[_i + register] = _v[register];
+        }
+
         // FX65
         private void fillRegisters(uint opcode)
         {
             byte endRegister = (byte)((opcode & 0x0F00) >> 8);
 
             for (int register = 0; register <= endRegister; register++)
-            {
                 _v[register] = _memory[_i + register];
-            }
         }
 
         #endregion

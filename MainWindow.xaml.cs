@@ -3,6 +3,7 @@ using OpenTK.Graphics.OpenGL;
 using OpenTK.Input;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Drawing;
 using System.Timers;
 using System.Windows;
@@ -116,7 +117,7 @@ namespace Chip8
             _openGLControl.Invalidate();
         }
 
-        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        private void Window_Closing(object sender, CancelEventArgs e)
         {
             _screenRefreshTimer.Stop();
             _engine.Stop();
