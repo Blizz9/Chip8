@@ -7,7 +7,7 @@ using System.Timers;
 
 namespace Chip8
 {
-    // TODO: Clean up code
+    // TODO: Clean up code in engine
     // TODO: Add save/load state
     // TODO: Add ROM selector and close
     // TODO: Add speed selector
