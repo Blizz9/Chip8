@@ -6,8 +6,14 @@
         xmlns:local="clr-namespace:Chip8"
         mc:Ignorable="d"
         Title="Chip-8 Emulator v0.5" ResizeMode="CanMinimize" SizeToContent="WidthAndHeight" Loaded="Window_Loaded" Closing="Window_Closing">
-
     <DockPanel>
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_Actions" SubmenuOpened="actionsMenuItem_SubmenuOpened" SubmenuClosed="actionsMenuItem_SubmenuClosed">
+                <MenuItem Header="_Open ROM..." Click="openROMMenuItem_Click" />
+                <Separator />
+                <MenuItem Header="_Exit" Click="exitMenuItem_Click" />
+            </MenuItem>
+        </Menu>
         <WindowsFormsHost x:Name="openGLControlHost" Height="512" Width="1024"/>
     </DockPanel>
     

@@ -9,12 +9,10 @@ namespace Chip8
 {
     // TODO: Clean up code in engine
     // TODO: Add save/load state
-    // TODO: Add ROM selector and close
     // TODO: Add speed selector
     // TODO: Add reset
-    // TODO: Add pause on menu popup
     // TODO: Add key graphic
-    // TODO: Add key highlighting based on opcodess
+    // TODO: Add key highlighting based on opcodes
 
     internal class Core
     {
@@ -43,6 +41,7 @@ namespace Chip8
         private byte _soundTimer;
         private byte[] _screen;
 
+        private Thread _coreThread;
         private System.Timers.Timer _internalTimer;
 
         private List<byte[]> _fonts;
@@ -122,76 +121,8 @@ namespace Chip8
 
             running = false;
             paused = false;
-        }
 
-        #region Private Properties
-
-        private bool running
-        {
-            get { lock (_sync) { return (_running); } }
-            set { lock (_sync) { _running = value; } }
-        }
-
-        private bool paused
-        {
-            get { lock (_sync) { return (_paused); } }
-            set { lock (_sync) { _paused = value; } }
-        }
-
-        private byte delayTimer
-        {
-            get { lock (_sync) { return (_delayTimer); } }
-            set { lock (_sync) { _delayTimer = value; } }
-        }
-
-        private byte soundTimer
-        {
-            get { lock (_sync) { return (_soundTimer); } }
-            set { lock (_sync) { _soundTimer = value; } }
-        }
-
-        #endregion
-
-        #region Accessible Properties
-
-        internal byte[] Screen
-        {
-            get { lock (_sync) { return (_screen); } }
-            set { lock (_sync) { _screen = value; } }
-        }
-
-        #endregion
-
-        #region Accessible Callbacks
-
-        internal Func<byte> GetKeypress
-        {
-            get { lock (_sync) { return (_getKeypress); } }
-            set { lock (_sync) { _getKeypress = value; } }
-        }
-
-        internal Action PlayTone
-        {
-            get { lock (_sync) { return (_playTone); } }
-            set { lock (_sync) { _playTone = value; } }
-        }
-
-        internal Action StopTone
-        {
-            get { lock (_sync) { return (_stopTone); } }
-            set { lock (_sync) { _stopTone = value; } }
-        }
-
-        #endregion
-
-        #region Accessible Routines
-
-        internal void Initialize()
-        {
-            Array.Clear(_memory, 0, _memory.Length);
-            Array.Clear(_v, 0, _v.Length);
-            Array.Clear(_stack, 0, _stack.Length);
-            Array.Clear(Screen, 0, Screen.Length);
+            #region Load Fonts
 
             _fonts = new List<byte[]>();
 
@@ -324,19 +255,90 @@ namespace Chip8
                 0x80  // 1000
             }); // F
 
+            #endregion
+        }
+
+        #region Private Properties
+
+        private bool running
+        {
+            get { lock (_sync) { return (_running); } }
+            set { lock (_sync) { _running = value; } }
+        }
+
+        private bool paused
+        {
+            get { lock (_sync) { return (_paused); } }
+            set { lock (_sync) { _paused = value; } }
+        }
+
+        private byte delayTimer
+        {
+            get { lock (_sync) { return (_delayTimer); } }
+            set { lock (_sync) { _delayTimer = value; } }
+        }
+
+        private byte soundTimer
+        {
+            get { lock (_sync) { return (_soundTimer); } }
+            set { lock (_sync) { _soundTimer = value; } }
+        }
+
+        #endregion
+
+        #region Accessible Properties
+
+        internal byte[] Screen
+        {
+            get { lock (_sync) { return (_screen); } }
+            set { lock (_sync) { _screen = value; } }
+        }
+
+        #endregion
+
+        #region Accessible Callbacks
+
+        internal Func<byte> GetKeypress
+        {
+            get { lock (_sync) { return (_getKeypress); } }
+            set { lock (_sync) { _getKeypress = value; } }
+        }
+
+        internal Action PlayTone
+        {
+            get { lock (_sync) { return (_playTone); } }
+            set { lock (_sync) { _playTone = value; } }
+        }
+
+        internal Action StopTone
+        {
+            get { lock (_sync) { return (_stopTone); } }
+            set { lock (_sync) { _stopTone = value; } }
+        }
+
+        #endregion
+
+        #region Accessible Routines
+
+        internal void Reset(string romFilename)
+        {
+            if ((_coreThread != null) && _coreThread.IsAlive)
+            {
+                _internalTimer.Stop();
+                running = false;
+
+                while (_coreThread.IsAlive) ;
+            }
+
+            Array.Clear(_memory, 0, _memory.Length);
+            Array.Clear(_v, 0, _v.Length);
+            Array.Clear(_stack, 0, _stack.Length);
+            Array.Clear(Screen, 0, Screen.Length);
+
             foreach (byte[] font in _fonts)
                 Buffer.BlockCopy(font, 0, _memory, (0x0000 + (_fonts.IndexOf(font) * FONT_SIZE)), FONT_SIZE);
 
-            //byte[] rom = File.ReadAllBytes("ROMs\\Chip8 emulator Logo [Garstyciuks].ch8");
-            //byte[] rom = File.ReadAllBytes("ROMs\\Chip8 Picture.ch8");
-            //byte[] rom = File.ReadAllBytes("ROMs\\Breakout [Carmelo Cortez, 1979].ch8");
-            //byte[] rom = File.ReadAllBytes("ROMs\\15 Puzzle [Roger Ivie].ch8");
-            //byte[] rom = File.ReadAllBytes("ROMs\\Cave.ch8");
-            byte[] rom = File.ReadAllBytes("ROMs\\Breakout (Brix hack) [David Winter, 1997].ch8");
-            //yte[] rom = File.ReadAllBytes("ROMs\\Particle Demo [zeroZshadow, 2008].ch8");
-            //byte[] rom = File.ReadAllBytes("ROMs\\Pong 2 (Pong hack) [David Winter, 1997].ch8");
-            //byte[] rom = File.ReadAllBytes("ROMs\\Tetris [Fran Dachille, 1991].ch8");
-
+            byte[] rom = File.ReadAllBytes(romFilename);
             Buffer.BlockCopy(rom, 0, _memory, (int)MEMORY_ROM_OFFSET, rom.Length);
 
             _i = 0;
@@ -344,16 +346,25 @@ namespace Chip8
             _sp = 0;
             delayTimer = 0;
             soundTimer = 0;
-        }
 
-        internal void Start()
-        {
             running = true;
 
-            _internalTimer.Start();
+            _coreThread = new Thread(loop);
+            _coreThread.Start();
 
-            Thread engineThread = new Thread(loop);
-            engineThread.Start();
+            _internalTimer.Start();
+        }
+
+        internal void Pause()
+        {
+            _internalTimer.Stop();
+            paused = true;
+        }
+
+        internal void Unpause()
+        {
+            _internalTimer.Start();
+            paused = false;
         }
 
         internal void Stop()
@@ -373,7 +384,9 @@ namespace Chip8
 
             while (running)
             {
-                if (!paused)
+                if (paused)
+                    Thread.Sleep(1);
+                else
                 {
                     if (!timingStopwatch.IsRunning)
                     {

@@ -89,8 +89,7 @@ namespace Chip8
 
         private void startCore()
         {
-            _core.Initialize();
-            _core.Start();
+            _core.Reset("logo.ch8");
         }
 
         private void cleanupCore()
@@ -213,5 +212,29 @@ namespace Chip8
         }
 
         #endregion
+
+        private void openROMMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog();
+            openFileDialog.Filter = "Chip-8 ROMs (*.ch8)|*.ch8|All files (*.*)|*.*";
+
+            if (openFileDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                _core.Reset(openFileDialog.FileName);
+        }
+
+        private void exitMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+
+        private void actionsMenuItem_SubmenuOpened(object sender, RoutedEventArgs e)
+        {
+            _core.Pause();
+        }
+
+        private void actionsMenuItem_SubmenuClosed(object sender, RoutedEventArgs e)
+        {
+            _core.Unpause();
+        }
     }
 }
