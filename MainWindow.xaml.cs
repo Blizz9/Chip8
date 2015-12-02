@@ -15,13 +15,17 @@ namespace Chip8
 {
     public partial class MainWindow : Window
     {
+        private const int SCREEN_REFRESH_FREQUENCY = 25;
+
+        private const int TONE_SAMPLE_RATE = 44100;
+        private const int TONE_FREQUENCY = 365;
+        private const double TONE_PERIOD = .20;
+
+        private Core _core;
         private GLControl _openGLControl;
-
-        private Engine _engine;
-
+        private System.Timers.Timer _videoRefreshTimer;
         private int _openALToneSourceID;
-
-        private System.Timers.Timer _screenRefreshTimer;
+        private Dictionary<Key, byte> _keyValueMap;
 
         public MainWindow()
         {
@@ -31,33 +35,91 @@ namespace Chip8
             _openGLControl.Width = (int)openGLControlHost.Width;
             _openGLControl.Height = (int)openGLControlHost.Height;
             openGLControlHost.Child = _openGLControl;
-            _openGLControl.Load += _openGLControl_Load;
             _openGLControl.Paint += _openGLControl_Paint;
 
-            short[] tone = new short[(int)(.20 * Engine.TONE_SAMPLE_RATE)];
-            for (int index = 0; index < tone.Length; index++)
-            {
-                tone[index] = (short)(short.MaxValue * Math.Sin(((2 * Math.PI * Engine.TONE_FREQUENCY) / Engine.TONE_SAMPLE_RATE) * index));
-            }
-
-            AudioContext audioContext = new AudioContext();
-            int openALBufferID = AL.GenBuffer();
-            _openALToneSourceID = AL.GenSource();
-            AL.BufferData(openALBufferID, ALFormat.Mono16, tone, (tone.Length * 2), (int)Engine.TONE_SAMPLE_RATE);
-            AL.Source(_openALToneSourceID, ALSourcei.Buffer, openALBufferID);
-            AL.Source(_openALToneSourceID, ALSourceb.Looping, true);
+            initializeCore();
+            initializeVideo();
+            initializeAudio();
+            initializeInput();
         }
 
-        private void _openGLControl_Load(object sender, EventArgs e)
+        #region Window Event Handlers
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            startCore();
+            startVideo();
+        }
+
+        private void Window_Closing(object sender, CancelEventArgs e)
+        {
+            cleanupVideo();
+            cleanupCore();
+        }
+
+        #endregion
+
+        #region OpenGL Control Event Handlers
+
+        public void _openGLControl_Paint(object sender, PaintEventArgs e)
+        {
+            refreshVideo();
+        }
+
+        #endregion
+
+        #region Video Refresh Timer Handlers
+
+        private void invalidateOpenGLControl(object sender, ElapsedEventArgs e)
+        {
+            _openGLControl.Invalidate();
+        }
+
+        #endregion
+
+        #region Core Routines
+
+        private void initializeCore()
+        {
+            _core = new Core();
+            _core.GetKeypress = getKeypress;
+            _core.PlayTone = playTone;
+            _core.StopTone = stopTone;
+        }
+
+        private void startCore()
+        {
+            _core.Initialize();
+            _core.Start();
+        }
+
+        private void cleanupCore()
+        {
+            _core.Stop();
+        }
+
+        #endregion
+
+        #region Video Routines
+
+        private void initializeVideo()
+        {
+            _videoRefreshTimer = new System.Timers.Timer(Global.MILLISECONDS_PER_SECOND / SCREEN_REFRESH_FREQUENCY);
+            _videoRefreshTimer.Elapsed += invalidateOpenGLControl;
+        }
+
+        private void startVideo()
         {
             GL.MatrixMode(MatrixMode.Projection);
             GL.LoadIdentity();
 
-            GL.Ortho(0, Engine.SCREEN_WIDTH, Engine.SCREEN_HEIGHT, 0, -1, 1);
+            GL.Ortho(0, Core.SCREEN_WIDTH, Core.SCREEN_HEIGHT, 0, -1, 1);
             GL.Viewport(0, 0, _openGLControl.Width, _openGLControl.Height);
+
+            _videoRefreshTimer.Start();
         }
 
-        public void _openGLControl_Paint(object sender, PaintEventArgs e)
+        private void refreshVideo()
         {
             GL.ClearColor(Color.Black);
 
@@ -70,12 +132,12 @@ namespace Chip8
 
             GL.Begin(PrimitiveType.Quads);
 
-            byte[] screen = _engine.Screen;
-            for (int screenY = 0; screenY < Engine.SCREEN_HEIGHT; screenY++)
+            byte[] screen = _core.Screen;
+            for (int screenY = 0; screenY < Core.SCREEN_HEIGHT; screenY++)
             {
-                for (int screenX = 0; screenX < Engine.SCREEN_WIDTH; screenX++)
+                for (int screenX = 0; screenX < Core.SCREEN_WIDTH; screenX++)
                 {
-                    if (screen[(screenY * Engine.SCREEN_WIDTH) + screenX] == 1)
+                    if (screen[(screenY * Core.SCREEN_WIDTH) + screenX] == 1)
                     {
                         GL.Vertex2(screenX, screenY);
                         GL.Vertex2(screenX + 1, screenY);
@@ -90,23 +152,27 @@ namespace Chip8
             _openGLControl.SwapBuffers();
         }
 
-        private byte getKeypress()
+        private void cleanupVideo()
         {
-            Dictionary<Key, byte> keyValueMap = new Dictionary<Key, byte>()
-            {
-                { Key.Number0, 0x0 }, { Key.Number1, 0x1 }, { Key.Number2, 0x2 }, { Key.Number3, 0x3 },
-                { Key.Number4, 0x4 }, { Key.Number5, 0x5 }, { Key.Number6, 0x6 }, { Key.Number7, 0x7 },
-                { Key.Number8, 0x8 }, { Key.Number9, 0x9 }, { Key.A, 0xA }, { Key.B, 0xB },
-                { Key.C, 0xC }, { Key.D, 0xD }, { Key.E, 0xE }, { Key.F, 0xF }
-            };
+            _videoRefreshTimer.Stop();
+        }
 
-            KeyboardState keyboardState = Keyboard.GetState();
+        #endregion
 
-            foreach (Key key in keyValueMap.Keys)
-                if (keyboardState.IsKeyDown(key))
-                    return (keyValueMap[key]);
-            
-            return (0xFF);
+        #region Audio Routines
+
+        private void initializeAudio()
+        {
+            short[] tone = new short[(int)(TONE_PERIOD * TONE_SAMPLE_RATE)];
+            for (int index = 0; index < tone.Length; index++)
+                tone[index] = (short)(short.MaxValue * Math.Sin(((2 * Math.PI * TONE_FREQUENCY) / TONE_SAMPLE_RATE) * index));
+
+            AudioContext audioContext = new AudioContext();
+            int openALBufferID = AL.GenBuffer();
+            _openALToneSourceID = AL.GenSource();
+            AL.BufferData(openALBufferID, ALFormat.Mono16, tone, (tone.Length * 2), (int)TONE_SAMPLE_RATE);
+            AL.Source(_openALToneSourceID, ALSourcei.Buffer, openALBufferID);
+            AL.Source(_openALToneSourceID, ALSourceb.Looping, true);
         }
 
         private void playTone()
@@ -120,40 +186,32 @@ namespace Chip8
             AL.SourceStop(_openALToneSourceID);
         }
 
-        private void Window_Activated(object sender, EventArgs e)
+        #endregion
+
+        #region Input Routines
+
+        private void initializeInput()
         {
-            if (_engine == null)
+            _keyValueMap = new Dictionary<Key, byte>()
             {
-                _screenRefreshTimer = new System.Timers.Timer(40);
-                _screenRefreshTimer.Elapsed += _screenRefreshTimer_Elapsed;
-                _screenRefreshTimer.Start();
-
-                _engine = new Engine();
-                _engine.GetKeypress = getKeypress;
-                _engine.PlayTone = playTone;
-                _engine.StopTone = stopTone;
-                _engine.Initialize();
-                _engine.Start();
-            }
+                { Key.Number0, 0x0 }, { Key.Number1, 0x1 }, { Key.Number2, 0x2 }, { Key.Number3, 0x3 },
+                { Key.Number4, 0x4 }, { Key.Number5, 0x5 }, { Key.Number6, 0x6 }, { Key.Number7, 0x7 },
+                { Key.Number8, 0x8 }, { Key.Number9, 0x9 }, { Key.A, 0xA }, { Key.B, 0xB },
+                { Key.C, 0xC }, { Key.D, 0xD }, { Key.E, 0xE }, { Key.F, 0xF }
+            };
         }
 
-        private void _screenRefreshTimer_Elapsed(object sender, ElapsedEventArgs e)
+        private byte getKeypress()
         {
-            _openGLControl.Invalidate();
+            KeyboardState keyboardState = Keyboard.GetState();
+
+            foreach (Key key in _keyValueMap.Keys)
+                if (keyboardState.IsKeyDown(key))
+                    return (_keyValueMap[key]);
+
+            return (0xFF);
         }
 
-        private void Window_Closing(object sender, CancelEventArgs e)
-        {
-            _screenRefreshTimer.Stop();
-            _engine.Stop();
-        }
-
-        private void Button_Click(object sender, RoutedEventArgs e)
-        {
-            //if (AL.GetSourceState(_openALToneSourceID) == ALSourceState.Playing)
-            //    AL.SourceStop(_openALToneSourceID);
-            //else
-            //    AL.SourcePlay(_openALToneSourceID);
-        }
+        #endregion
     }
 }

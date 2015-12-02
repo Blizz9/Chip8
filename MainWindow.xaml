@@ -5,10 +5,9 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Chip8"
         mc:Ignorable="d"
-        Title="Chip-8 Emulator v0.5" ResizeMode="CanMinimize" SizeToContent="WidthAndHeight" Closing="Window_Closing" Activated="Window_Activated">
+        Title="Chip-8 Emulator v0.5" ResizeMode="CanMinimize" SizeToContent="WidthAndHeight" Loaded="Window_Loaded" Closing="Window_Closing">
 
-    <DockPanel Margin="10">
-        <!--<Button Height="30" Width="100" Click="Button_Click" />-->
+    <DockPanel>
         <WindowsFormsHost x:Name="openGLControlHost" Height="512" Width="1024"/>
     </DockPanel>
     

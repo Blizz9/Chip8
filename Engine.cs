@@ -16,10 +16,10 @@ namespace Chip8
     // TODO: Add key graphic
     // TODO: Add key highlighting based on opcodess
 
-    internal class Engine
+    internal class Core
     {
-        public const byte SCREEN_WIDTH = 64;
-        public const byte SCREEN_HEIGHT = 32;
+        internal const byte SCREEN_WIDTH = 64;
+        internal const byte SCREEN_HEIGHT = 32;
 
         private const uint MEMORY_SIZE = 0x1000;
         private const byte REGISTER_COUNT = 0x10;
@@ -29,22 +29,16 @@ namespace Chip8
         private const byte OPCODE_SIZE = 0x2;
         private const byte FONT_SIZE = 0x5;
 
-        private const byte BATCH_COUNT = 50;
-        private const uint CYCLE_HZ = 700;
-        private const byte INTERNAL_TIMER_HZ = 60;
-
-        public const uint TONE_SAMPLE_RATE = 44100;
-        public const uint TONE_FREQUENCY = 365;
-
-        public const byte BITS_PER_BYTE = 8;
-        private const uint MILLISECONDS_PER_SECOND = 1000;
+        private const int BATCH_FREQUENCY = 50;
+        private const int CYCLE_FREQUENCY = 700;
+        private const int INTERNAL_TIMER_FREQUENCY = 60;
 
         private byte[] _memory;
-        private uint _pc; // program counter
-        private byte[] _v; // registers
-        private uint _i; // index register
+        private uint _pc;
+        private byte[] _v;
+        private uint _i;
         private uint[] _stack;
-        private byte _sp; // stack pointer
+        private byte _sp;
         private byte _delayTimer;
         private byte _soundTimer;
         private byte[] _screen;
@@ -68,14 +62,14 @@ namespace Chip8
         private Action _playTone;
         private Action _stopTone;
 
-        internal Engine()
+        internal Core()
         {
             _memory = new byte[MEMORY_SIZE];
             _v = new byte[REGISTER_COUNT];
             _stack = new uint[STACK_SIZE];
             Screen = new byte[SCREEN_WIDTH * SCREEN_HEIGHT];
 
-            _internalTimer = new System.Timers.Timer(MILLISECONDS_PER_SECOND / INTERNAL_TIMER_HZ);
+            _internalTimer = new System.Timers.Timer(Global.MILLISECONDS_PER_SECOND / INTERNAL_TIMER_FREQUENCY);
             _internalTimer.Elapsed += internalTimerClock;
 
             _opcodeMap = new Dictionary<byte, Action<uint>>();
@@ -190,7 +184,7 @@ namespace Chip8
 
         #endregion
 
-        #region Accessible Methods
+        #region Accessible Routines
 
         internal void Initialize()
         {
@@ -338,8 +332,8 @@ namespace Chip8
             //byte[] rom = File.ReadAllBytes("ROMs\\Breakout [Carmelo Cortez, 1979].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\15 Puzzle [Roger Ivie].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\Cave.ch8");
-            //byte[] rom = File.ReadAllBytes("ROMs\\Breakout (Brix hack) [David Winter, 1997].ch8");
-            byte[] rom = File.ReadAllBytes("ROMs\\Particle Demo [zeroZshadow, 2008].ch8");
+            byte[] rom = File.ReadAllBytes("ROMs\\Breakout (Brix hack) [David Winter, 1997].ch8");
+            //yte[] rom = File.ReadAllBytes("ROMs\\Particle Demo [zeroZshadow, 2008].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\Pong 2 (Pong hack) [David Winter, 1997].ch8");
             //byte[] rom = File.ReadAllBytes("ROMs\\Tetris [Fran Dachille, 1991].ch8");
 
@@ -370,7 +364,7 @@ namespace Chip8
 
         #endregion
 
-        #region Main Loop Methods
+        #region Main Loop Routines
 
         private void loop()
         {
@@ -392,12 +386,12 @@ namespace Chip8
 
                     cycleCount++;
 
-                    if (cycleCount >= (CYCLE_HZ / BATCH_COUNT))
+                    if (cycleCount >= (CYCLE_FREQUENCY / BATCH_FREQUENCY))
                     {
                         timingStopwatch.Stop();
 
-                        if (timingStopwatch.ElapsedMilliseconds < (MILLISECONDS_PER_SECOND / BATCH_COUNT))
-                            Thread.Sleep((int)((MILLISECONDS_PER_SECOND / BATCH_COUNT) - timingStopwatch.ElapsedMilliseconds));
+                        if (timingStopwatch.ElapsedMilliseconds < (Global.MILLISECONDS_PER_SECOND / BATCH_FREQUENCY))
+                            Thread.Sleep((int)((Global.MILLISECONDS_PER_SECOND / BATCH_FREQUENCY) - timingStopwatch.ElapsedMilliseconds));
                     }
                 }
             }
