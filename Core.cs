@@ -7,8 +7,6 @@ using System.Timers;
 
 namespace Chip8
 {
-    // TODO: Move uints to ushort
-    // TODO: Rename logo
     // TODO: Add key graphic
     // TODO: Add key highlighting based on opcodes
 
@@ -17,10 +15,10 @@ namespace Chip8
         internal const byte SCREEN_WIDTH = 64;
         internal const byte SCREEN_HEIGHT = 32;
 
-        private const uint MEMORY_SIZE = 0x1000;
+        private const ushort MEMORY_SIZE = 0x1000;
         private const byte REGISTER_COUNT = 0x10;
         private const byte STACK_SIZE = 0x10;
-        private const uint MEMORY_ROM_OFFSET = 0x200;
+        private const ushort MEMORY_ROM_OFFSET = 0x200;
 
         internal const byte OPCODE_SIZE = 0x2;
 
@@ -31,10 +29,10 @@ namespace Chip8
         private const string SAVE_STATE_FILENAME = "SaveState.ss";
 
         private byte[] _memory;
-        private uint _pc;
+        private ushort _pc;
         private byte[] _v;
-        private uint _i;
-        private uint[] _stack;
+        private ushort _i;
+        private ushort[] _stack;
         private byte _sp;
         private byte _delayTimer;
         private byte _soundTimer;
@@ -60,7 +58,7 @@ namespace Chip8
         {
             _memory = new byte[MEMORY_SIZE];
             _v = new byte[REGISTER_COUNT];
-            _stack = new uint[STACK_SIZE];
+            _stack = new ushort[STACK_SIZE];
             Screen = new byte[SCREEN_WIDTH * SCREEN_HEIGHT];
 
             _operations = new Operations(this);
@@ -95,7 +93,7 @@ namespace Chip8
             set { _memory = value; }
         }
 
-        internal uint PC
+        internal ushort PC
         {
             get { return (_pc); }
             set { _pc = value; }
@@ -107,13 +105,13 @@ namespace Chip8
             set { _v = value; }
         }
 
-        internal uint I
+        internal ushort I
         {
             get { return (_i); }
             set { _i = value; }
         }
 
-        internal uint[] Stack
+        internal ushort[] Stack
         {
             get { return (_stack); }
             set { _stack = value; }
@@ -264,12 +262,12 @@ namespace Chip8
             BinaryReader binaryReader = new BinaryReader(new MemoryStream(saveState));
 
             _memory = binaryReader.ReadBytes((int)MEMORY_SIZE);
-            _pc = binaryReader.ReadUInt32();
+            _pc = binaryReader.ReadUInt16();
             _v = binaryReader.ReadBytes(REGISTER_COUNT);
-            _i = binaryReader.ReadUInt32();
+            _i = binaryReader.ReadUInt16();
             for (int index = 0; index < STACK_SIZE; index++)
             {
-                _stack[index] = BitConverter.ToUInt32(binaryReader.ReadBytes(sizeof(UInt32)), 0);
+                _stack[index] = BitConverter.ToUInt16(binaryReader.ReadBytes(sizeof(UInt32)), 0);
             }
             _sp = binaryReader.ReadByte();
             DelayTimer = binaryReader.ReadByte();
@@ -318,7 +316,7 @@ namespace Chip8
 
         private void clock()
         {
-            uint opcode = (uint)(_memory[_pc] << 8) | _memory[_pc + 1];
+            ushort opcode = (ushort)((_memory[_pc] << 8) | _memory[_pc + 1]);
             _pc += OPCODE_SIZE;
 
             _operations.ProcessOpcode(opcode);

@@ -7,17 +7,17 @@ namespace Chip8
     {
         private Core _core;
 
-        private Dictionary<byte, Action<uint>> _opcodeMap;
-        private Dictionary<byte, Action<uint>> _opcodeMap00EX;
-        private Dictionary<byte, Action<uint>> _opcodeMap8XXX;
-        private Dictionary<byte, Action<uint>> _opcodeMapEXXX;
-        private Dictionary<byte, Action<uint>> _opcodeMapFXXX;
+        private Dictionary<byte, Action<ushort>> _opcodeMap;
+        private Dictionary<byte, Action<ushort>> _opcodeMap00EX;
+        private Dictionary<byte, Action<ushort>> _opcodeMap8XXX;
+        private Dictionary<byte, Action<ushort>> _opcodeMapEXXX;
+        private Dictionary<byte, Action<ushort>> _opcodeMapFXXX;
 
         internal Operations(Core core)
         {
             _core = core;
 
-            _opcodeMap = new Dictionary<byte, Action<uint>>();
+            _opcodeMap = new Dictionary<byte, Action<ushort>>();
             _opcodeMap.Add(0x0, map00EXOperations);
             _opcodeMap.Add(0x1, jump);
             _opcodeMap.Add(0x2, callSubroutine);
@@ -35,11 +35,11 @@ namespace Chip8
             _opcodeMap.Add(0xE, mapEXXXOperations);
             _opcodeMap.Add(0xF, mapFXXXOperations);
 
-            _opcodeMap00EX = new Dictionary<byte, Action<uint>>();
+            _opcodeMap00EX = new Dictionary<byte, Action<ushort>>();
             _opcodeMap00EX.Add(0xE0, clearScreen);
             _opcodeMap00EX.Add(0xEE, returnSubroutine);
 
-            _opcodeMap8XXX = new Dictionary<byte, Action<uint>>();
+            _opcodeMap8XXX = new Dictionary<byte, Action<ushort>>();
             _opcodeMap8XXX.Add(0x0, copy);
             _opcodeMap8XXX.Add(0x1, or);
             _opcodeMap8XXX.Add(0x2, and);
@@ -50,11 +50,11 @@ namespace Chip8
             _opcodeMap8XXX.Add(0x7, subtractReverse);
             _opcodeMap8XXX.Add(0xE, shiftLeft);
 
-            _opcodeMapEXXX = new Dictionary<byte, Action<uint>>();
+            _opcodeMapEXXX = new Dictionary<byte, Action<ushort>>();
             _opcodeMapEXXX.Add(0x9E, jumpIfKeyPressed);
             _opcodeMapEXXX.Add(0xA1, jumpIfKeyNotPressed);
 
-            _opcodeMapFXXX = new Dictionary<byte, Action<uint>>();
+            _opcodeMapFXXX = new Dictionary<byte, Action<ushort>>();
             _opcodeMapFXXX.Add(0x07, readDelayTimer);
             _opcodeMapFXXX.Add(0x0A, waitForKeypress);
             _opcodeMapFXXX.Add(0x15, loadDelayTimer);
@@ -66,7 +66,7 @@ namespace Chip8
             _opcodeMapFXXX.Add(0x65, fillRegisters);
         }
 
-        internal void ProcessOpcode(uint opcode)
+        internal void ProcessOpcode(ushort opcode)
         {
             byte opcodeMSN = (byte)((opcode & 0xF000) >> 12);
             _opcodeMap[opcodeMSN](opcode);
@@ -74,25 +74,25 @@ namespace Chip8
 
         #region Mapping
 
-        private void map00EXOperations(uint opcode)
+        private void map00EXOperations(ushort opcode)
         {
             byte opcodeLSB = (byte)(opcode & 0x00FF);
             _opcodeMap00EX[opcodeLSB](opcode);
         }
 
-        private void map8XXXOperations(uint opcode)
+        private void map8XXXOperations(ushort opcode)
         {
             byte opcodeLSN = (byte)(opcode & 0x000F);
             _opcodeMap8XXX[opcodeLSN](opcode);
         }
 
-        private void mapEXXXOperations(uint opcode)
+        private void mapEXXXOperations(ushort opcode)
         {
             byte opcodeLSB = (byte)(opcode & 0x00FF);
             _opcodeMapEXXX[opcodeLSB](opcode);
         }
 
-        private void mapFXXXOperations(uint opcode)
+        private void mapFXXXOperations(ushort opcode)
         {
             byte opcodeLSB = (byte)(opcode & 0x00FF);
             _opcodeMapFXXX[opcodeLSB](opcode);
@@ -105,13 +105,13 @@ namespace Chip8
         #region 00EX Operations
 
         // 00E0
-        private void clearScreen(uint opcode)
+        private void clearScreen(ushort opcode)
         {
             Array.Clear(_core.Screen, 0, _core.Screen.Length);
         }
 
         // 00EE
-        private void returnSubroutine(uint opcode)
+        private void returnSubroutine(ushort opcode)
         {
             _core.SP--;
             _core.PC = _core.Stack[_core.SP];
@@ -120,23 +120,23 @@ namespace Chip8
         #endregion
 
         // 1NNN
-        private void jump(uint opcode)
+        private void jump(ushort opcode)
         {
-            uint address = opcode & 0x0FFF;
+            ushort address = (ushort)(opcode & 0x0FFF);
             _core.PC = address;
         }
 
         // 2NNN
-        private void callSubroutine(uint opcode)
+        private void callSubroutine(ushort opcode)
         {
-            uint address = opcode & 0x0FFF;
+            ushort address = (ushort)(opcode & 0x0FFF);
             _core.Stack[_core.SP] = _core.PC;
             _core.SP++;
             _core.PC = address;
         }
 
         // 3XNN
-        private void jumpIfEqualTo(uint opcode)
+        private void jumpIfEqualTo(ushort opcode)
         {
             byte register = (byte)((opcode & 0x0F00) >> 8);
             byte value = (byte)(opcode & 0x00FF);
@@ -145,7 +145,7 @@ namespace Chip8
         }
 
         // 4XNN
-        private void jumpIfNotEqualTo(uint opcode)
+        private void jumpIfNotEqualTo(ushort opcode)
         {
             byte register = (byte)((opcode & 0x0F00) >> 8);
             byte value = (byte)(opcode & 0x00FF);
@@ -154,7 +154,7 @@ namespace Chip8
         }
 
         // 5XY0
-        private void jumpIfEqual(uint opcode)
+        private void jumpIfEqual(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
             byte registerY = (byte)((opcode & 0x00F0) >> 4);
@@ -163,7 +163,7 @@ namespace Chip8
         }
 
         // 6XNN
-        private void load(uint opcode)
+        private void load(ushort opcode)
         {
             byte register = (byte)((opcode & 0x0F00) >> 8);
             byte value = (byte)(opcode & 0x00FF);
@@ -171,7 +171,7 @@ namespace Chip8
         }
 
         // 7XNN
-        private void appendValue(uint opcode)
+        private void appendValue(ushort opcode)
         {
             byte register = (byte)((opcode & 0x0F00) >> 8);
             byte value = (byte)(opcode & 0x00FF);
@@ -181,7 +181,7 @@ namespace Chip8
         #region 8XXX Operations
 
         // 8XY0
-        private void copy(uint opcode)
+        private void copy(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
             byte registerY = (byte)((opcode & 0x00F0) >> 4);
@@ -189,7 +189,7 @@ namespace Chip8
         }
 
         // 8XY1
-        private void or(uint opcode)
+        private void or(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
             byte registerY = (byte)((opcode & 0x00F0) >> 4);
@@ -197,7 +197,7 @@ namespace Chip8
         }
 
         // 8XY2
-        private void and(uint opcode)
+        private void and(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
             byte registerY = (byte)((opcode & 0x00F0) >> 4);
@@ -205,7 +205,7 @@ namespace Chip8
         }
 
         // 8XY3
-        private void xor(uint opcode)
+        private void xor(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
             byte registerY = (byte)((opcode & 0x00F0) >> 4);
@@ -213,7 +213,7 @@ namespace Chip8
         }
 
         // 8XY4
-        private void add(uint opcode)
+        private void add(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
             byte registerY = (byte)((opcode & 0x00F0) >> 4);
@@ -224,7 +224,7 @@ namespace Chip8
         }
 
         // 8XY5
-        private void subtract(uint opcode)
+        private void subtract(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
             byte registerY = (byte)((opcode & 0x00F0) >> 4);
@@ -234,7 +234,7 @@ namespace Chip8
         }
 
         // 8XY6
-        private void shiftRight(uint opcode)
+        private void shiftRight(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
 
@@ -243,7 +243,7 @@ namespace Chip8
         }
 
         // 8XY7
-        private void subtractReverse(uint opcode)
+        private void subtractReverse(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
             byte registerY = (byte)((opcode & 0x00F0) >> 4);
@@ -253,7 +253,7 @@ namespace Chip8
         }
 
         // 8XYE
-        private void shiftLeft(uint opcode)
+        private void shiftLeft(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
 
@@ -264,7 +264,7 @@ namespace Chip8
         #endregion
 
         // 9XY0
-        private void jumpIfNotEqual(uint opcode)
+        private void jumpIfNotEqual(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
             byte registerY = (byte)((opcode & 0x00F0) >> 4);
@@ -273,21 +273,21 @@ namespace Chip8
         }
 
         // ANNN
-        private void loadIndex(uint opcode)
+        private void loadIndex(ushort opcode)
         {
-            uint address = opcode & 0x0FFF;
+            ushort address = (ushort)(opcode & 0x0FFF);
             _core.I = address;
         }
 
         // BNNN
-        private void jumpWithOffset(uint opcode)
+        private void jumpWithOffset(ushort opcode)
         {
-            uint address = opcode & 0x0FFF;
-            _core.PC = address + _core.V[0x0];
+            ushort address = (ushort)(opcode & 0x0FFF);
+            _core.PC = (ushort)(address + _core.V[0x0]);
         }
 
         // CXNN
-        private void random(uint opcode)
+        private void random(ushort opcode)
         {
             byte register = (byte)((opcode & 0x0F00) >> 8);
             byte value = (byte)(opcode & 0x00FF);
@@ -299,7 +299,7 @@ namespace Chip8
         }
 
         // DXYN
-        private void drawSprite(uint opcode)
+        private void drawSprite(ushort opcode)
         {
             byte xRegister = (byte)((opcode & 0x0F00) >> 8);
             byte yRegister = (byte)((opcode & 0x00F0) >> 4);
@@ -350,7 +350,7 @@ namespace Chip8
         #region EXXX Operations
 
         // EX9E
-        private void jumpIfKeyPressed(uint opcode)
+        private void jumpIfKeyPressed(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
 
@@ -361,7 +361,7 @@ namespace Chip8
         }
 
         // EXA1
-        private void jumpIfKeyNotPressed(uint opcode)
+        private void jumpIfKeyNotPressed(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
 
@@ -376,14 +376,14 @@ namespace Chip8
         #region FXXX Operations
 
         // FX07
-        private void readDelayTimer(uint opcode)
+        private void readDelayTimer(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
             _core.V[registerX] = _core.DelayTimer;
         }
 
         // FX0A
-        private void waitForKeypress(uint opcode)
+        private void waitForKeypress(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
 
@@ -396,14 +396,14 @@ namespace Chip8
         }
 
         // FX15
-        private void loadDelayTimer(uint opcode)
+        private void loadDelayTimer(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
             _core.DelayTimer = _core.V[registerX];
         }
 
         // FX18
-        private void loadSoundTimer(uint opcode)
+        private void loadSoundTimer(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
             _core.SoundTimer = _core.V[registerX];
@@ -413,21 +413,21 @@ namespace Chip8
         }
 
         // FX1E
-        private void addToIndex(uint opcode)
+        private void addToIndex(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
             _core.I += _core.V[registerX];
         }
 
         // FX29
-        private void addressFontCharacter(uint opcode)
+        private void addressFontCharacter(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
             _core.I = (byte)(_core.V[registerX] * Font.FONT_CHARACTER_SIZE);
         }
 
         // FX33
-        private void storeBCD(uint opcode)
+        private void storeBCD(ushort opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
 
@@ -437,7 +437,7 @@ namespace Chip8
         }
 
         // FX55
-        private void dumpRegisters(uint opcode)
+        private void dumpRegisters(ushort opcode)
         {
             byte endRegister = (byte)((opcode & 0x0F00) >> 8);
 
@@ -446,7 +446,7 @@ namespace Chip8
         }
 
         // FX65
-        private void fillRegisters(uint opcode)
+        private void fillRegisters(ushort opcode)
         {
             byte endRegister = (byte)((opcode & 0x0F00) >> 8);
 
