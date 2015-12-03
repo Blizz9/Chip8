@@ -152,7 +152,7 @@ namespace Chip8
 
         private void startCore()
         {
-            _runningROMFilename = "logo.ch8";
+            _runningROMFilename = "LogoROM.ch8";
             _core.Reset(_runningROMFilename);
         }
 
