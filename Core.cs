@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
@@ -7,10 +6,8 @@ using System.Timers;
 
 namespace Chip8
 {
-    // TODO: Clean up code in engine
     // TODO: Add save/load state
     // TODO: Add speed selector
-    // TODO: Add reset
     // TODO: Add key graphic
     // TODO: Add key highlighting based on opcodes
 
@@ -30,9 +27,6 @@ namespace Chip8
         private const int CYCLE_FREQUENCY = 700;
         private const int INTERNAL_TIMER_FREQUENCY = 60;
 
-        private Operations _operations;
-        private Font _font;
-
         private byte[] _memory;
         private uint _pc;
         private byte[] _v;
@@ -42,6 +36,9 @@ namespace Chip8
         private byte _delayTimer;
         private byte _soundTimer;
         private byte[] _screen;
+
+        private Operations _operations;
+        private Font _font;
 
         private Thread _coreThread;
         private System.Timers.Timer _internalTimer;
@@ -57,13 +54,13 @@ namespace Chip8
 
         internal Core()
         {
-            _operations = new Operations(this);
-            _font = new Font();
-
             _memory = new byte[MEMORY_SIZE];
             _v = new byte[REGISTER_COUNT];
             _stack = new uint[STACK_SIZE];
             Screen = new byte[SCREEN_WIDTH * SCREEN_HEIGHT];
+
+            _operations = new Operations(this);
+            _font = new Font();
 
             _internalTimer = new System.Timers.Timer(Global.MILLISECONDS_PER_SECOND / INTERNAL_TIMER_FREQUENCY);
             _internalTimer.Elapsed += internalTimerClock;
@@ -213,8 +210,8 @@ namespace Chip8
 
         internal void Unpause()
         {
-            _internalTimer.Start();
             paused = false;
+            _internalTimer.Start();
         }
 
         internal void Stop()

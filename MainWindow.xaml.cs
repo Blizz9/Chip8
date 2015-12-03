@@ -27,6 +27,8 @@ namespace Chip8
         private int _openALToneSourceID;
         private Dictionary<Key, byte> _keyValueMap;
 
+        private string _runningROMFilename;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -77,7 +79,15 @@ namespace Chip8
             openFileDialog.Filter = "Chip-8 ROMs (*.ch8)|*.ch8|All files (*.*)|*.*";
 
             if (openFileDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                _core.Reset(openFileDialog.FileName);
+            {
+                _runningROMFilename = openFileDialog.FileName;
+                _core.Reset(_runningROMFilename);
+            }
+        }
+
+        private void resetMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            _core.Reset(_runningROMFilename);
         }
 
         private void exitMenuItem_Click(object sender, RoutedEventArgs e)
@@ -117,7 +127,8 @@ namespace Chip8
 
         private void startCore()
         {
-            _core.Reset("logo.ch8");
+            _runningROMFilename = "logo.ch8";
+            _core.Reset(_runningROMFilename);
         }
 
         private void cleanupCore()
