@@ -59,6 +59,34 @@ namespace Chip8
 
         #endregion
 
+        #region Menu Event Handlers
+
+        private void actionsMenuItem_SubmenuOpened(object sender, RoutedEventArgs e)
+        {
+            _core.Pause();
+        }
+
+        private void actionsMenuItem_SubmenuClosed(object sender, RoutedEventArgs e)
+        {
+            _core.Unpause();
+        }
+
+        private void openROMMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog();
+            openFileDialog.Filter = "Chip-8 ROMs (*.ch8)|*.ch8|All files (*.*)|*.*";
+
+            if (openFileDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                _core.Reset(openFileDialog.FileName);
+        }
+
+        private void exitMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+
+        #endregion
+
         #region OpenGL Control Event Handlers
 
         public void _openGLControl_Paint(object sender, PaintEventArgs e)
@@ -212,29 +240,5 @@ namespace Chip8
         }
 
         #endregion
-
-        private void openROMMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            OpenFileDialog openFileDialog = new OpenFileDialog();
-            openFileDialog.Filter = "Chip-8 ROMs (*.ch8)|*.ch8|All files (*.*)|*.*";
-
-            if (openFileDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                _core.Reset(openFileDialog.FileName);
-        }
-
-        private void exitMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            Close();
-        }
-
-        private void actionsMenuItem_SubmenuOpened(object sender, RoutedEventArgs e)
-        {
-            _core.Pause();
-        }
-
-        private void actionsMenuItem_SubmenuClosed(object sender, RoutedEventArgs e)
-        {
-            _core.Unpause();
-        }
     }
 }

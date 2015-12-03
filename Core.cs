@@ -25,11 +25,12 @@ namespace Chip8
         private const uint MEMORY_ROM_OFFSET = 0x200;
 
         private const byte OPCODE_SIZE = 0x2;
-        private const byte FONT_SIZE = 0x5;
 
         private const int BATCH_FREQUENCY = 50;
         private const int CYCLE_FREQUENCY = 700;
         private const int INTERNAL_TIMER_FREQUENCY = 60;
+
+        private Font _font;
 
         private byte[] _memory;
         private uint _pc;
@@ -43,8 +44,6 @@ namespace Chip8
 
         private Thread _coreThread;
         private System.Timers.Timer _internalTimer;
-
-        private List<byte[]> _fonts;
 
         private Dictionary<byte, Action<uint>> _opcodeMap;
         private Dictionary<byte, Action<uint>> _opcodeMap00EX;
@@ -63,6 +62,8 @@ namespace Chip8
 
         internal Core()
         {
+            _font = new Font();
+
             _memory = new byte[MEMORY_SIZE];
             _v = new byte[REGISTER_COUNT];
             _stack = new uint[STACK_SIZE];
@@ -121,141 +122,6 @@ namespace Chip8
 
             running = false;
             paused = false;
-
-            #region Load Fonts
-
-            _fonts = new List<byte[]>();
-
-            _fonts.Add(new byte[FONT_SIZE]
-            {
-                0xF0, // 1111
-                0x90, // 1001
-                0x90, // 1001
-                0x90, // 1001
-                0xF0  // 1111
-            }); // 0
-            _fonts.Add(new byte[FONT_SIZE]
-            {
-                0x20, // 0010
-                0x60, // 0110
-                0x20, // 0010
-                0x20, // 0010
-                0x70  // 0111
-            }); // 1
-            _fonts.Add(new byte[FONT_SIZE]
-            {
-                0xF0, // 1111
-                0x10, // 0001
-                0xF0, // 1111
-                0x80, // 1000
-                0xF0  // 1111
-            }); // 2
-            _fonts.Add(new byte[FONT_SIZE]
-            {
-                0xF0, // 1111
-                0x10, // 0001
-                0xF0, // 1111
-                0x10, // 0001
-                0xF0  // 1111
-            }); // 3
-            _fonts.Add(new byte[FONT_SIZE]
-            {
-                0x90, // 1001
-                0x90, // 1001
-                0xF0, // 1111
-                0x10, // 0001
-                0x10  // 0001
-            }); // 4
-            _fonts.Add(new byte[FONT_SIZE]
-            {
-                0xF0, // 1111
-                0x80, // 1000
-                0xF0, // 1111
-                0x10, // 0001
-                0xF0  // 1111
-            }); // 5
-            _fonts.Add(new byte[FONT_SIZE]
-            {
-                0xF0, // 1111
-                0x80, // 1000
-                0xF0, // 1111
-                0x90, // 1001
-                0xF0  // 1111
-            }); // 6
-            _fonts.Add(new byte[FONT_SIZE]
-            {
-                0xF0, // 1111
-                0x10, // 0001
-                0x20, // 0010
-                0x40, // 0100
-                0x40  // 0100
-            }); // 7
-            _fonts.Add(new byte[FONT_SIZE]
-            {
-                0xF0, // 1111
-                0x90, // 1001
-                0xF0, // 1111
-                0x90, // 1001
-                0xF0  // 1111
-            }); // 8
-            _fonts.Add(new byte[FONT_SIZE]
-            {
-                0xF0, // 1111
-                0x90, // 1001
-                0xF0, // 1111
-                0x10, // 0001
-                0xF0  // 1111
-            }); // 9
-            _fonts.Add(new byte[FONT_SIZE]
-            {
-                0xF0, // 1111
-                0x90, // 1001
-                0xF0, // 1111
-                0x90, // 1001
-                0x90  // 1001
-            }); // A
-            _fonts.Add(new byte[FONT_SIZE]
-            {
-                0xE0, // 1110
-                0x90, // 1001
-                0xE0, // 1110
-                0x90, // 1001
-                0xE0  // 1110
-            }); // B
-            _fonts.Add(new byte[FONT_SIZE]
-            {
-                0xF0, // 1111
-                0x80, // 1000
-                0x80, // 1000
-                0x80, // 1000
-                0xF0  // 1111
-            }); // C
-            _fonts.Add(new byte[FONT_SIZE]
-            {
-                0xE0, // 1110
-                0x90, // 1001
-                0x90, // 1001
-                0x90, // 1001
-                0xE0  // 1110
-            }); // D
-            _fonts.Add(new byte[FONT_SIZE]
-            {
-                0xF0, // 1111
-                0x80, // 1000
-                0xF0, // 1111
-                0x80, // 1000
-                0xF0  // 1111
-            }); // E
-            _fonts.Add(new byte[FONT_SIZE]
-            {
-                0xF0, // 1111
-                0x80, // 1000
-                0xF0, // 1111
-                0x80, // 1000
-                0x80  // 1000
-            }); // F
-
-            #endregion
         }
 
         #region Private Properties
@@ -335,8 +201,8 @@ namespace Chip8
             Array.Clear(_stack, 0, _stack.Length);
             Array.Clear(Screen, 0, Screen.Length);
 
-            foreach (byte[] font in _fonts)
-                Buffer.BlockCopy(font, 0, _memory, (0x0000 + (_fonts.IndexOf(font) * FONT_SIZE)), FONT_SIZE);
+            foreach (byte[] fontCharacter in _font.FontCharacters)
+                Buffer.BlockCopy(fontCharacter, 0, _memory, (0x0000 + (_font.FontCharacters.IndexOf(fontCharacter) * Font.FONT_CHARACTER_SIZE)), Font.FONT_CHARACTER_SIZE);
 
             byte[] rom = File.ReadAllBytes(romFilename);
             Buffer.BlockCopy(rom, 0, _memory, (int)MEMORY_ROM_OFFSET, rom.Length);
@@ -787,7 +653,7 @@ namespace Chip8
         private void addressFontCharacter(uint opcode)
         {
             byte registerX = (byte)((opcode & 0x0F00) >> 8);
-            _i = (byte)(_v[registerX] * FONT_SIZE);
+            _i = (byte)(_v[registerX] * Font.FONT_CHARACTER_SIZE);
         }
 
         // FX33
