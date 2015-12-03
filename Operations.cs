@@ -389,7 +389,7 @@ namespace Chip8
 
             byte keypress = 0xFF;
 
-            while ((keypress == 0xFF) && _core.Running)
+            while ((keypress == 0xFF) && _core.Running && !_core.Paused)
                 keypress = _core.GetKeypress();
 
             _core.V[registerX] = keypress;

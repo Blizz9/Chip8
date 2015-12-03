@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Timers;
 
 namespace Chip8
 {
-    // TODO: Add save/load state
+    // TODO: Move uints to ushort
+    // TODO: Rename logo
     // TODO: Add key graphic
     // TODO: Add key highlighting based on opcodes
 
@@ -25,6 +27,8 @@ namespace Chip8
         private const int BATCH_FREQUENCY = 50;
         private const int INITIAL_CYCLE_FREQUENCY = 600;
         private const int INTERNAL_TIMER_FREQUENCY = 60;
+
+        private const string SAVE_STATE_FILENAME = "SaveState.ss";
 
         private byte[] _memory;
         private uint _pc;
@@ -68,18 +72,8 @@ namespace Chip8
             _cycleFrequency = INITIAL_CYCLE_FREQUENCY;
 
             Running = false;
-            paused = false;
+            Paused = false;
         }
-
-        #region Private Properties
-
-        private bool paused
-        {
-            get { lock (_sync) { return (_paused); } }
-            set { lock (_sync) { _paused = value; } }
-        }
-
-        #endregion
 
         #region Accessible Properties
 
@@ -87,6 +81,12 @@ namespace Chip8
         {
             get { lock (_sync) { return (_running); } }
             set { lock (_sync) { _running = value; } }
+        }
+
+        internal bool Paused
+        {
+            get { lock (_sync) { return (_paused); } }
+            set { lock (_sync) { _paused = value; } }
         }
 
         internal byte[] Memory
@@ -213,12 +213,12 @@ namespace Chip8
         internal void Pause()
         {
             _internalTimer.Stop();
-            paused = true;
+            Paused = true;
         }
 
         internal void Unpause()
         {
-            paused = false;
+            Paused = false;
             _internalTimer.Start();
         }
 
@@ -230,10 +230,53 @@ namespace Chip8
 
         internal void SaveState()
         {
+            BinaryWriter binaryWriter = new BinaryWriter(new MemoryStream());
+
+            binaryWriter.Write(_memory);
+            binaryWriter.Write(_pc);
+            binaryWriter.Write(_v);
+            binaryWriter.Write(_i);
+            binaryWriter.Write(_stack.SelectMany(BitConverter.GetBytes).ToArray());
+            binaryWriter.Write(_sp);
+            binaryWriter.Write(DelayTimer);
+            binaryWriter.Write(SoundTimer);
+            binaryWriter.Write(Screen);
+
+            byte[] saveState = ((MemoryStream)binaryWriter.BaseStream).GetBuffer();
+
+            FileStream fileStream = new FileStream(SAVE_STATE_FILENAME, FileMode.Create, FileAccess.Write);
+            fileStream.Write(saveState, 0, saveState.Length);
+
+            binaryWriter.Flush();
+            binaryWriter.Close();
+
+            fileStream.Flush();
+            fileStream.Close();
         }
 
         internal void LoadState()
         {
+            FileStream fileStream = new FileStream(SAVE_STATE_FILENAME, FileMode.Open, FileAccess.Read);
+            byte[] saveState = new byte[fileStream.Length];
+            fileStream.Read(saveState, 0, saveState.Length);
+            fileStream.Close();
+
+            BinaryReader binaryReader = new BinaryReader(new MemoryStream(saveState));
+
+            _memory = binaryReader.ReadBytes((int)MEMORY_SIZE);
+            _pc = binaryReader.ReadUInt32();
+            _v = binaryReader.ReadBytes(REGISTER_COUNT);
+            _i = binaryReader.ReadUInt32();
+            for (int index = 0; index < STACK_SIZE; index++)
+            {
+                _stack[index] = BitConverter.ToUInt32(binaryReader.ReadBytes(sizeof(UInt32)), 0);
+            }
+            _sp = binaryReader.ReadByte();
+            DelayTimer = binaryReader.ReadByte();
+            SoundTimer = binaryReader.ReadByte();
+            Screen = binaryReader.ReadBytes(SCREEN_WIDTH * SCREEN_HEIGHT);
+
+            binaryReader.Close();
         }
 
         #endregion
@@ -247,7 +290,7 @@ namespace Chip8
 
             while (Running)
             {
-                if (paused)
+                if (Paused)
                     Thread.Sleep(1);
                 else
                 {

@@ -6,11 +6,9 @@ using OpenTK.Input;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Drawing;
 using System.Timers;
 using System.Windows;
 using System.Windows.Forms;
-using System.Windows.Media;
 
 namespace Chip8
 {
