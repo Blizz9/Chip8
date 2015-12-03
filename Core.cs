@@ -7,7 +7,6 @@ using System.Timers;
 namespace Chip8
 {
     // TODO: Add save/load state
-    // TODO: Add speed selector
     // TODO: Add key graphic
     // TODO: Add key highlighting based on opcodes
 
@@ -24,7 +23,7 @@ namespace Chip8
         internal const byte OPCODE_SIZE = 0x2;
 
         private const int BATCH_FREQUENCY = 50;
-        private const int CYCLE_FREQUENCY = 700;
+        private const int INITIAL_CYCLE_FREQUENCY = 600;
         private const int INTERNAL_TIMER_FREQUENCY = 60;
 
         private byte[] _memory;
@@ -42,6 +41,7 @@ namespace Chip8
 
         private Thread _coreThread;
         private System.Timers.Timer _internalTimer;
+        private int _cycleFrequency;
 
         private readonly object _sync = new object();
 
@@ -64,6 +64,8 @@ namespace Chip8
 
             _internalTimer = new System.Timers.Timer(Global.MILLISECONDS_PER_SECOND / INTERNAL_TIMER_FREQUENCY);
             _internalTimer.Elapsed += internalTimerClock;
+
+            _cycleFrequency = INITIAL_CYCLE_FREQUENCY;
 
             Running = false;
             paused = false;
@@ -139,6 +141,12 @@ namespace Chip8
         {
             get { lock (_sync) { return (_soundTimer); } }
             set { lock (_sync) { _soundTimer = value; } }
+        }
+
+        internal int CycleFrequency
+        {
+            get { lock (_sync) { return (_cycleFrequency); } }
+            set { lock (_sync) { _cycleFrequency = value; } }
         }
 
         #endregion
@@ -220,6 +228,14 @@ namespace Chip8
             Running = false;
         }
 
+        internal void SaveState()
+        {
+        }
+
+        internal void LoadState()
+        {
+        }
+
         #endregion
 
         #region Main Loop Routines
@@ -246,7 +262,7 @@ namespace Chip8
 
                     cycleCount++;
 
-                    if (cycleCount >= (CYCLE_FREQUENCY / BATCH_FREQUENCY))
+                    if (cycleCount >= (CycleFrequency / BATCH_FREQUENCY))
                     {
                         timingStopwatch.Stop();
 

@@ -10,6 +10,7 @@ using System.Drawing;
 using System.Timers;
 using System.Windows;
 using System.Windows.Forms;
+using System.Windows.Media;
 
 namespace Chip8
 {
@@ -90,6 +91,32 @@ namespace Chip8
             _core.Reset(_runningROMFilename);
         }
 
+        private void speedMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            System.Windows.Controls.MenuItem clickedMenuItem = (System.Windows.Controls.MenuItem)sender;
+            System.Windows.Controls.MenuItem mainMenuItem = (System.Windows.Controls.MenuItem)(clickedMenuItem).Parent;
+
+            foreach (var child in LogicalTreeHelper.GetChildren(mainMenuItem))
+            {
+                if ((child is System.Windows.Controls.MenuItem) && ((System.Windows.Controls.MenuItem)child).IsCheckable)
+                    ((System.Windows.Controls.MenuItem)child).IsChecked = false;
+            }
+
+            clickedMenuItem.IsChecked = true;
+
+            _core.CycleFrequency = Convert.ToInt32(((string)clickedMenuItem.Header).Split(' ')[0].TrimStart('_'));
+        }
+
+        private void saveStateMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            _core.SaveState();
+        }
+
+        private void loadStateMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            _core.LoadState();
+        }
+
         private void exitMenuItem_Click(object sender, RoutedEventArgs e)
         {
             Close();
@@ -159,14 +186,14 @@ namespace Chip8
 
         private void refreshVideo()
         {
-            GL.ClearColor(Color.Black);
+            GL.ClearColor(System.Drawing.Color.Black);
 
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             GL.MatrixMode(MatrixMode.Modelview);
             GL.LoadIdentity();
 
-            GL.Color3(Color.White);
+            GL.Color3(System.Drawing.Color.White);
 
             GL.Begin(PrimitiveType.Quads);
 

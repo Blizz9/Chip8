@@ -13,6 +13,19 @@
                 <Separator />
                 <MenuItem Header="_Reset" Click="resetMenuItem_Click" />
                 <Separator />
+                <MenuItem Header="_100 Hz" IsCheckable="True" Click="speedMenuItem_Click" />
+                <MenuItem Header="_300 Hz" IsCheckable="True" Click="speedMenuItem_Click" />
+                <MenuItem Header="_500 Hz" IsCheckable="True" Click="speedMenuItem_Click" />
+                <MenuItem Header="_600 Hz" IsCheckable="True" IsChecked="True" Click="speedMenuItem_Click" />
+                <MenuItem Header="_700 Hz" IsCheckable="True" Click="speedMenuItem_Click" />
+                <MenuItem Header="_800 Hz" IsCheckable="True" Click="speedMenuItem_Click" />
+                <MenuItem Header="_1000 Hz" IsCheckable="True" Click="speedMenuItem_Click" />
+                <MenuItem Header="_1500 Hz" IsCheckable="True" Click="speedMenuItem_Click" />
+                <MenuItem Header="_2000 Hz" IsCheckable="True" Click="speedMenuItem_Click" />
+                <Separator />
+                <MenuItem Header="_Save State" Click="saveStateMenuItem_Click" />
+                <MenuItem Header="_Load State" Click="loadStateMenuItem_Click" />
+                <Separator />
                 <MenuItem Header="_Exit" Click="exitMenuItem_Click" />
             </MenuItem>
         </Menu>
